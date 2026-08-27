@@ -1,6 +1,6 @@
 from vespa.io import VespaQueryResponse
 
-import app
+from scripts import app
 
 
 def query():
@@ -21,3 +21,7 @@ def query():
             print(response.hits)
         else:
             print("Query has failed")
+
+
+if __name__ == "__main__":
+    query()
