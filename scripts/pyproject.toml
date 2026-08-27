@@ -10,9 +10,11 @@ requires-python = ">=3.13"
 dependencies = [
     "datasets>=5.0.1",
     "pyvespa>=1.2.4",
+    "typer>=0.27.1",
 ]
 
 [project.scripts]
+start = "scripts.app:main"
 query = "scripts.query:query"
 
 [build-system]
