@@ -1,13 +1,13 @@
 from vespa.io import VespaQueryResponse
 
-from scripts import app
+from scripts import app, eprint
 
 
 def query():
     vespa = app.load()
 
     with vespa.syncio() as session:
-        print("> Launching query")
+        eprint("> Launching query")
         response: VespaQueryResponse = session.query(
             body={
                 "yql": "select title, body from doc where userQuery()",
@@ -18,7 +18,9 @@ def query():
         )
 
         if response.is_successful():
-            print(response.hits)
+            import json
+
+            print(json.dumps(response.json))
         else:
             print("Query has failed")
 
