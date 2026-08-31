@@ -16,7 +16,7 @@ struct Fields {
 #[ignore]
 #[tokio::test]
 async fn test_search_success() {
-    let vespa = Vespa::new("http://localhost:8080".to_string());
+    let vespa = Vespa::insecure("http://localhost:8080".to_string());
     let response: Response<Document> = vespa
         .search(&json!({
                 "yql": "select title, body from doc where userQuery()",

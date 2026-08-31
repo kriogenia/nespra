@@ -1,6 +1,11 @@
-start:
-  @cd ./scripts && uv run start --restart
+mod crates
 
-[group("test")]
-integration:
-  @cd ./crates/vespa && cargo test -- --include-ignored
+set default-list := true
+
+# TODO: set-up with uv and Vespa container set-up
+
+# Starts the development Vespa Docker service
+[group("docker")]
+[working-directory: "scripts"]
+@start:
+  uv run start --restart
