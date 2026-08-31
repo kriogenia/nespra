@@ -8,7 +8,7 @@ pub struct Vespa {
 }
 
 impl Vespa {
-    fn with_client(mut url: String, client: Client) -> Self {
+    pub fn with_client(mut url: String, client: Client) -> Self {
         while url.ends_with("/") {
             url.remove(url.len() - 1);
         }
@@ -18,8 +18,7 @@ impl Vespa {
         Self { client, search_url }
     }
 
-    pub fn insecure(url: String) -> Self {
-        // TODO: validate url is not HTTPS
+    pub fn new(url: String) -> Self {
         Vespa::with_client(url, Client::new())
     }
 }
