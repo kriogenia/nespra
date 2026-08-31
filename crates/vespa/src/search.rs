@@ -94,7 +94,7 @@ pub struct Coverage {
 pub struct Degraded {
     pub match_phase: bool,
     pub timeout: bool,
-    pub adaptative_timeout: bool,
+    pub adaptive_timeout: bool,
     #[serde(rename = "anntimeout")]
     pub ann_timeout: bool,
     pub non_ideal_state: bool,
@@ -190,7 +190,7 @@ mod test {
               "degraded": {
                 "match-phase": true,
                 "timeout": true,
-                "adaptative-timeout": true,
+                "adaptive-timeout": true,
                 "anntimeout": true,
                 "non-ideal-state": true
               }
@@ -237,7 +237,7 @@ mod test {
                         degraded: Some(Degraded {
                             match_phase: true,
                             timeout: true,
-                            adaptative_timeout: true,
+                            adaptive_timeout: true,
                             ann_timeout: true,
                             non_ideal_state: true
                         }),
