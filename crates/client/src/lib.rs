@@ -1,5 +1,6 @@
 use reqwest::Client;
 
+pub mod error;
 pub mod search;
 
 pub struct Vespa {

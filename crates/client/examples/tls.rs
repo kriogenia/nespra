@@ -2,7 +2,7 @@ use std::{error::Error, fs::File, io::Read};
 
 use reqwest::{Client, Identity};
 use serde_json::{Value, json};
-use vespa::{Vespa, search::Response};
+use vespa_client::{Vespa, search::Response};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
