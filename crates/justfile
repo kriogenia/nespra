@@ -1,9 +1,9 @@
 # Runs all the integration tests (they require the Docker to be running locally)
 [group("test")]
 @integration:
-  cd ./vespa && cargo test -- --ignored
+  cd ./client && cargo test -- --ignored
 
 # Executes all the examples to validate they still work
 [group("test")]
 @examples:
-  cd ./vespa && cargo run --example search
+  cd ./client && cargo run --example search
