@@ -32,3 +32,6 @@ async fn test_search_success() {
     assert!(response.timing.is_some());
     assert!(response.trace.is_some());
 }
+
+// TODO: test search response error
+// TODO: test search vespa error

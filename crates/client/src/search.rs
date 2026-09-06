@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
-use crate::{Vespa, error::HttpError};
+use crate::{Vespa, error::SearchError};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Response<T> {
@@ -127,24 +127,24 @@ impl Vespa {
     pub async fn search<B: Serialize + ?Sized, H: DeserializeOwned>(
         &self,
         body: &B,
-    ) -> Result<Response<H>, HttpError> {
-        let response = self
+    ) -> Result<Response<H>, SearchError> {
+        let response: Response<H> = self
             .client
             .post(&self.search_url)
             // TODO: .version(Version::HTTP_2)
             .json(body)
             .send()
             .await
-            .map_err(HttpError::Request)?
+            .map_err(SearchError::Request)?
             .json()
             .await
-            .map_err(HttpError::Response)?;
+            .map_err(SearchError::Response)?;
 
-        // TODO: check if Vespa responses can have both results and errors
-        // to evaluate if we should transform the responses with errors into
-        // a Error and return that as part of the query
-
-        Ok(response)
+        if response.root.errors.is_empty() {
+            Ok(response)
+        } else {
+            Err(SearchError::Vespa(response.root.errors))
+        }
     }
 }
 
