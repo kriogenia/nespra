@@ -33,6 +33,8 @@ pub struct Root<T> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     pub relevance: f64,
+
+    #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<T>,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -299,8 +301,7 @@ mod test {
         let json = r#"
         {
           "root": {
-            "relevance": 0.56,
-            "children": []
+            "relevance": 0.56
           }
         }
         "#;
