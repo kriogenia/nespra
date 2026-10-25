@@ -48,10 +48,65 @@ pub struct Request<'a, E> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<&'a str>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<Presentation<'a>>,
+
     #[serde(flatten)]
     pub extra_fields: E,
 }
 
 pub type SimpleRequest<'a> = Request<'a, ()>;
 
-// TODO: rest of query API: https://docs.vespa.ai/en/reference/api/query.html
+/// Helper model to presentation options in search requests.
+///
+/// Knowingly evades the `format` option as the client is not designed for any
+/// other format than JSON (for now) and CBOR in the future.
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct Presentation<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bolding: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timing: Option<bool>,
+    #[serde(rename = "format.tensors", skip_serializing_if = "Option::is_none")]
+    pub format_tensors: Option<TensorFormat>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TensorFormat {
+    Short,
+    Long,
+    ShortValue,
+    LongValue,
+    Hex,
+    HexValue,
+}
+
+#[cfg(test)]
+mod test {
+    use serde_json::json;
+
+    use crate::search::{Presentation, TensorFormat};
+
+    #[test]
+    fn serialize_presentation() {
+        let presentation = Presentation {
+            bolding: Some(true),
+            summary: Some("default"),
+            format_tensors: Some(TensorFormat::ShortValue),
+            ..Default::default()
+        };
+
+        let value = serde_json::to_value(presentation).unwrap();
+
+        assert_eq!(*value.get("bolding").unwrap(), json!(true));
+        assert_eq!(*value.get("summary").unwrap(), json!("default"));
+        assert_eq!(*value.get("format.tensors").unwrap(), json!("short-value"));
+        assert!(value.get("template").is_none());
+        assert!(value.get("timing").is_none());
+    }
+}

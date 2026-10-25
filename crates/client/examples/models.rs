@@ -4,7 +4,10 @@
 use std::error::Error;
 
 use serde::{Deserialize, Serialize};
-use vespa_client::{Vespa, search::Request, search::Response};
+use vespa_client::{
+    Vespa,
+    search::{Presentation, Request, Response},
+};
 
 #[derive(Deserialize, Serialize)]
 struct Document {
@@ -21,8 +24,6 @@ struct Fields {
 struct Extension<'a> {
     query: &'a str,
     ranking: &'a str,
-    #[serde(rename = "presentation.timing")]
-    timing: bool,
 }
 
 #[tokio::main]
@@ -34,8 +35,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             extra_fields: Extension {
                 query: "Is statin use connected to breast cancer?",
                 ranking: "bm25",
-                timing: true,
             },
+            presentation: Some(Presentation {
+                timing: Some(true),
+                ..Default::default()
+            }),
             ..Default::default()
         })
         .await?;
