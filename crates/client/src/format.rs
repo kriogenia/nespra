@@ -2,10 +2,11 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::error::CodecError;
 
-/// Wire format used to talk with Vespa, for both request and response bodies.
+/// Format of the response bodies returned by Vespa.
 ///
 /// CBOR is the default as it is smaller and faster than JSON, but requires
-/// Vespa 8.623.5 or later.
+/// Vespa 8.623.5 or later. Request bodies are always sent as JSON, as Vespa
+/// does not accept them in CBOR.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Format {
@@ -17,23 +18,11 @@ pub enum Format {
 }
 
 impl Format {
-    /// MIME type sent as `Content-Type` and `Accept` headers.
+    /// MIME type to request in the `Accept` header.
     pub(crate) fn mime(&self) -> &'static str {
         match self {
             Format::Cbor => "application/cbor",
             Format::Json => "application/json",
-        }
-    }
-
-    pub(crate) fn encode<B: Serialize + ?Sized>(&self, body: &B) -> Result<Vec<u8>, CodecError> {
-        match self {
-            Format::Cbor => {
-                let mut buffer = Vec::new();
-                ciborium::into_writer(body, &mut buffer)
-                    .map_err(|e| CodecError::Encode(e.into()))?;
-                Ok(buffer)
-            }
-            Format::Json => serde_json::to_vec(body).map_err(|e| CodecError::Encode(e.into())),
         }
     }
 
@@ -43,6 +32,12 @@ impl Format {
             Format::Json => serde_json::from_slice(bytes).map_err(|e| CodecError::Decode(e.into())),
         }
     }
+}
+
+/// Encodes a request body. Vespa only understands JSON requests, whatever
+/// the `Format` used for the response.
+pub(crate) fn encode_request<B: Serialize + ?Sized>(body: &B) -> Result<Vec<u8>, CodecError> {
+    serde_json::to_vec(body).map_err(|e| CodecError::Encode(e.into()))
 }
 
 #[cfg(test)]
@@ -70,9 +65,8 @@ mod test {
         })
     }
 
-    fn assert_round_trip(format: Format) {
-        let bytes = format.encode(&sample()).unwrap();
-        let response: Response<Value> = format.decode(&bytes).unwrap();
+    fn assert_decoded(format: Format, bytes: &[u8]) {
+        let response: Response<Value> = format.decode(bytes).unwrap();
 
         assert_eq!(response.root.relevance, 0.96);
         assert_eq!(response.total_count(), 97);
@@ -82,13 +76,21 @@ mod test {
     }
 
     #[test]
-    fn test_cbor_round_trip() {
-        assert_round_trip(Format::Cbor);
+    fn test_cbor_decode() {
+        let mut bytes = Vec::new();
+        ciborium::into_writer(&sample(), &mut bytes).unwrap();
+        assert_decoded(Format::Cbor, &bytes);
     }
 
     #[test]
-    fn test_json_round_trip() {
-        assert_round_trip(Format::Json);
+    fn test_json_decode() {
+        assert_decoded(Format::Json, &serde_json::to_vec(&sample()).unwrap());
+    }
+
+    #[test]
+    fn test_requests_are_encoded_as_json() {
+        let bytes = encode_request(&json!({"yql": "select * from doc where true"})).unwrap();
+        assert_eq!(bytes, br#"{"yql":"select * from doc where true"}"#);
     }
 
     #[test]

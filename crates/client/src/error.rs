@@ -16,8 +16,7 @@ pub enum SearchError {
     #[error("{0}")]
     Response(reqwest::Error),
 
-    /// Error encoding the request body or decoding the response body
-    /// with the configured `Format`.
+    /// Error encoding the request body or decoding the response body.
     #[error(transparent)]
     Codec(#[from] CodecError),
 
@@ -27,8 +26,7 @@ pub enum SearchError {
     Vespa(Vec<crate::search::Error>),
 }
 
-/// Errors encoding or decoding bodies in any of the supported `Format`s.
-/// Shared by all the endpoints, each one wraps it in its own error type.
+/// Errors encoding request bodies or decoding response bodies.
 #[derive(Error, Debug)]
 pub enum CodecError {
     /// The request body could not be serialized.
