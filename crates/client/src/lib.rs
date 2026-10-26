@@ -9,6 +9,7 @@ pub use format::Format;
 pub struct Vespa {
     client: Client,
     search_url: String,
+    format: Format,
 }
 
 impl Vespa {
@@ -19,10 +20,20 @@ impl Vespa {
 
         let search_url = format!("{url}/search/");
 
-        Self { client, search_url }
+        Self {
+            client,
+            search_url,
+            format: Format::default(),
+        }
     }
 
     pub fn new(url: String) -> Self {
         Vespa::with_client(url, Client::new())
+    }
+
+    /// Sets the format requested for the responses. Requests are always sent as JSON.
+    pub fn format(mut self, format: Format) -> Self {
+        self.format = format;
+        self
     }
 }
