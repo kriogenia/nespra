@@ -19,11 +19,19 @@ impl<T> Response<T> {
     }
 
     pub fn total_count(&self) -> i32 {
-        self.root.fields.as_ref().map_or_default(|f| f.total_count)
+        self.root
+            .fields
+            .as_ref()
+            .map(|f| f.total_count)
+            .unwrap_or_default()
     }
 
     pub fn indexed_docs_count(&self) -> i64 {
-        self.root.coverage.as_ref().map_or_default(|c| c.documents)
+        self.root
+            .coverage
+            .as_ref()
+            .map(|c| c.documents)
+            .unwrap_or_default()
     }
 }
 
