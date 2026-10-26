@@ -4,9 +4,10 @@ mod response;
 pub use request::*;
 pub use response::*; // TODO: hide behind feature
 
+use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{Vespa, error::SearchError};
+use crate::{Vespa, error::SearchError, format::encode_request};
 
 impl Vespa {
     /// Runs a search request with the specified body and returns a results
@@ -14,9 +15,9 @@ impl Vespa {
     ///
     /// # Request
     ///
-    /// Can be any JSON serializable object. This means that you can use the
-    /// helping `search::Request` struct, a string built `json!` invokation or
-    /// use a custom struct implementating Serialize.
+    /// Can be any serializable object, always sent as JSON. This means that you can use the
+    /// helping `search::Request` struct, a `json!` invokation or use a custom struct
+    /// implementating Serialize.
     ///
     /// # Response
     ///
@@ -32,17 +33,20 @@ impl Vespa {
         &self,
         body: &B,
     ) -> Result<Response<H>, SearchError> {
-        let response: Response<H> = self
+        let response = self
             .client
             .post(&self.search_url)
             // TODO: .version(Version::HTTP_2)
-            .json(body)
+            .header(CONTENT_TYPE, "application/json")
+            .header(ACCEPT, self.format.mime())
+            .body(encode_request(body)?)
             .send()
             .await
             .map_err(SearchError::Request)?
-            .json()
+            .bytes()
             .await
             .map_err(SearchError::Response)?;
+        let response: Response<H> = self.format.decode(&response)?;
 
         if response.root.errors.is_empty() {
             Ok(response)

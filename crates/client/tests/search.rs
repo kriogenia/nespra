@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use vespa_client::{Vespa, search::Response};
+use vespa_client::{Format, Vespa, search::Response};
 
 #[derive(Deserialize, Serialize)]
 struct Document {
@@ -13,10 +13,23 @@ struct Fields {
     body: String,
 }
 
+fn vespa(format: Format) -> Vespa {
+    Vespa::new("http://localhost:8080".to_string()).format(format)
+}
+
 #[ignore]
 #[tokio::test]
-async fn test_search_success() {
-    let vespa = Vespa::new("http://localhost:8080".to_string());
+async fn test_search_success_cbor() {
+    search_success(vespa(Format::Cbor)).await;
+}
+
+#[ignore]
+#[tokio::test]
+async fn test_search_success_json() {
+    search_success(vespa(Format::Json)).await;
+}
+
+async fn search_success(vespa: Vespa) {
     let response: Response<Document> = vespa
         .search(&json!({
                 "yql": "select title, body from doc where userQuery()",
