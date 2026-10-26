@@ -1,6 +1,6 @@
+use nespra::{Format, Vespa, search::Response};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use vespa_client::{Format, Vespa, search::Response};
 
 #[derive(Deserialize, Serialize)]
 struct Document {

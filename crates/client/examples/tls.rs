@@ -1,8 +1,8 @@
 use std::{error::Error, fs::File, io::Read};
 
+use nespra::{Vespa, search::Response};
 use reqwest::{Client, Identity};
 use serde_json::{Value, json};
-use vespa_client::{Vespa, search::Response};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

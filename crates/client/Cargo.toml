@@ -1,11 +1,14 @@
 [package]
-name = "vespa-client"
+name = "nespra"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "Async Rust client for Vespa"
+description = "Unofficial async Rust client for the Vespa search engine"
 repository = "https://github.com/kriogenia/nespra"
 license = "MIT OR Apache-2.0"
+readme = "../../README.md"
+keywords = ["vespa", "search", "client", "cbor", "async"]
+categories = ["api-bindings", "asynchronous"]
 
 [dependencies]
 ciborium = "0.2.2"

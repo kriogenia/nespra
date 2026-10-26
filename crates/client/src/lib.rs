@@ -1,3 +1,10 @@
+//! Unofficial async client for [Vespa](https://vespa.ai).
+//!
+//! This is an independent community project, not affiliated with or endorsed by Vespa.ai.
+//!
+//! Responses are requested in CBOR by default (Vespa 8.623.5 or later), see [`Format`] to use
+//! JSON instead. Requests are always sent as JSON.
+
 use reqwest::Client;
 
 pub mod error;

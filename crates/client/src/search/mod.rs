@@ -28,7 +28,7 @@ impl Vespa {
     ///
     /// # Errors
     ///
-    /// Any of `vespa_client::error::SearchError`.
+    /// Any of `nespra::error::SearchError`.
     pub async fn search<B: Serialize + ?Sized, H: DeserializeOwned>(
         &self,
         body: &B,

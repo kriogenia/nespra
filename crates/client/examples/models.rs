@@ -3,11 +3,11 @@
 
 use std::error::Error;
 
-use serde::{Deserialize, Serialize};
-use vespa_client::{
+use nespra::{
     Vespa,
     search::{Presentation, Request, Response},
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 struct Document {

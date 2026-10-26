@@ -1,8 +1,8 @@
 use std::error::Error;
 
+use nespra::{Vespa, search::Response};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use vespa_client::{Vespa, search::Response};
 
 #[derive(Deserialize, Serialize)]
 struct Document {
