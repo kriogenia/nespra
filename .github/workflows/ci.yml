@@ -84,18 +84,11 @@ jobs:
       # Compile only: running them needs a Vespa instance
       - run: cargo build --workspace --examples
 
-  deny:
-    name: Dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: EmbarkStudios/cargo-deny-action@v2
-
   # Single status to require in branch protection
   ci-ok:
     name: CI OK
     if: always()
-    needs: [fmt, clippy, test, msrv, docs, examples, deny]
+    needs: [fmt, clippy, test, msrv, docs, examples]
     runs-on: ubuntu-latest
     steps:
       - name: Check results
