@@ -2,6 +2,9 @@
 name = "vespa-client"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "Async Rust client for Vespa"
+repository = "https://github.com/kriogenia/nespra"
 
 [dependencies]
 reqwest = { version = "0.13.4", features = ["json"] }

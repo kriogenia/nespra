@@ -86,6 +86,8 @@ pub enum TensorFormat {
     HexValue,
 }
 
+// TODO: other models
+
 #[cfg(test)]
 mod test {
     use serde_json::json;
