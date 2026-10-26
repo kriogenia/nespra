@@ -1,7 +1,10 @@
 use reqwest::Client;
 
 pub mod error;
+mod format;
 pub mod search;
+
+pub use format::Format;
 
 pub struct Vespa {
     client: Client,
