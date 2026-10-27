@@ -1,10 +1,28 @@
 # nespra
 
 [![CI](https://github.com/kriogenia/nespra/actions/workflows/ci.yml/badge.svg)](https://github.com/kriogenia/nespra/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/vespa-client.svg)](https://crates.io/crates/vespa-client)
-[![Docs.rs](https://img.shields.io/docsrs/vespa-client)](https://docs.rs/vespa-client)
-[![License](https://img.shields.io/crates/l/vespa-client.svg)](#license)
+[![Crates.io](https://img.shields.io/crates/v/nespra.svg)](https://crates.io/crates/nespra)
+[![Docs.rs](https://img.shields.io/docsrs/nespra)](https://docs.rs/nespra)
+[![License](https://img.shields.io/crates/l/nespra.svg)](#license)
 
+Unofficial async Rust client for [Vespa](https://vespa.ai), the open-source search and big data serving engine. It supports the search API, with responses in CBOR (default) or JSON.
+
+> **Disclaimer:** nespra is an independent community project. It is not affiliated with, endorsed by, or sponsored by Vespa.ai. Vespa and related names are the property of their respective owners.
+
+## Usage
+
+```rust
+use nespra::{Vespa, search::Response};
+use serde_json::{Value, json};
+
+let vespa = Vespa::new("http://localhost:8080".to_string());
+let response: Response<Value> = vespa
+    .search(&json!({
+        "yql": "select title, body from doc where userQuery()",
+        "query": "Is statin use connected to breast cancer?",
+    }))
+    .await?;
+```
 
 ## Releasing
 
@@ -20,6 +38,6 @@ Run `just ci` to execute the same quality checks as CI locally.
 
 ## License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
+Licensed under either of [Apache License, Version 2.0](https://github.com/kriogenia/nespra/blob/main/LICENSE-APACHE) or [MIT license](https://github.com/kriogenia/nespra/blob/main/LICENSE-MIT) at your option.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this project by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

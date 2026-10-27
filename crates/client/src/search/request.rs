@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// ```
 /// # use serde_json;
 ///
-/// let request = vespa_client::search::Request::<serde_json::Value> {
+/// let request = nespra::search::Request::<serde_json::Value> {
 ///     yql: "select * from doc where true",
 ///     hits: Some(5),
 ///     search_chain: Some("fast"),

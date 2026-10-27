@@ -1,17 +1,19 @@
 use std::{error::Error, fs::File, io::Read};
 
-use reqwest::{Client, Identity};
+use nespra::{Vespa, search::Response};
+use reqwest::Identity;
 use serde_json::{Value, json};
-use vespa_client::{Vespa, search::Response};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut identity = Vec::new();
     File::open("my-certs.pem")?.read_to_end(&mut identity)?;
     let identity = Identity::from_pem(&identity)?;
-    let client = Client::builder().identity(identity).build()?;
 
-    let vespa = Vespa::with_client("http://localhost:8080".to_string(), client);
+    let vespa = Vespa::builder("http://localhost:8080".to_string())
+        .identity(identity)
+        .build();
+
     let response: Response<Value> = vespa
         .search(&json!({
                 "yql": "select title, body from doc where userQuery()",
