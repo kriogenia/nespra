@@ -6,6 +6,8 @@ use http::{
     HeaderMap, HeaderName, HeaderValue,
     header::{AUTHORIZATION, InvalidHeaderValue},
 };
+use std::time::Duration;
+
 use reqwest::{Client, ClientBuilder, Identity};
 
 pub mod error;
@@ -13,6 +15,11 @@ mod format;
 pub mod search;
 
 pub use format::Format;
+
+/// Default time to establish a connection.
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+/// Default time for a whole request, from connecting to reading the full response.
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct Vespa {
     client: Client,
@@ -44,6 +51,8 @@ pub struct VespaBuilder {
     format: Format,
     headers: HeaderMap,
     user_agent: HeaderValue,
+    connect_timeout: Duration,
+    timeout: Duration,
 }
 
 impl VespaBuilder {
@@ -58,6 +67,8 @@ impl VespaBuilder {
             format: Format::default(),
             headers: HeaderMap::new(),
             user_agent: HeaderValue::from_static(concat!("nespra/", env!("CARGO_PKG_VERSION"))),
+            connect_timeout: DEFAULT_CONNECT_TIMEOUT,
+            timeout: DEFAULT_TIMEOUT,
         }
     }
 
@@ -114,6 +125,23 @@ impl VespaBuilder {
         self
     }
 
+    /// Sets the time allowed to establish a connection, 10 seconds by default.
+    pub fn connect_timeout(mut self, timeout: Duration) -> Self {
+        self.connect_timeout = timeout;
+        self
+    }
+
+    /// Sets the time allowed for a whole request, from connecting to reading the full
+    /// response, 30 seconds by default. It can be overridden per request with
+    /// the extended functions like [`Vespa::search_with`].
+    ///
+    /// This is independent of the `timeout` parameter of the search request, which is
+    /// the time Vespa spends on the query. Keep this one above it.
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
     pub fn format(mut self, format: Format) -> Self {
         self.format = format;
         self
@@ -136,6 +164,8 @@ impl VespaBuilder {
             .client
             .user_agent(self.user_agent)
             .default_headers(self.headers)
+            .connect_timeout(self.connect_timeout)
+            .timeout(self.timeout)
             .build()
             .expect("clients built with the builder to be always correct");
 
