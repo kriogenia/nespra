@@ -77,6 +77,7 @@ pub struct Presentation<'a> {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum TensorFormat {
     Short,
     Long,

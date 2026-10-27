@@ -8,6 +8,7 @@ use crate::error::CodecError;
 /// Vespa 8.623.5 or later. Request bodies are always sent as JSON, as Vespa
 /// does not accept them in CBOR.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Format {
     /// Binary CBOR encoding.
     #[default]

@@ -4,7 +4,7 @@ mod response;
 
 #[cfg(feature = "request-models")]
 pub use request::*;
-pub use response::*; // TODO: hide behind feature
+pub use response::*;
 
 use std::time::Duration;
 

@@ -1,7 +1,8 @@
 use thiserror::Error;
 
-/// Errors that can during API requests
+/// Errors that can happen during API requests
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum SearchError {
     /// Error triggered while building and sending the HTTP request.
     /// Some common errors bundled on this one are:
@@ -12,7 +13,7 @@ pub enum SearchError {
     Request(reqwest::Error),
 
     /// Error triggered while handling the HTTP response.
-    /// Usually a problem while deserializing the resposne.
+    /// Usually a problem while deserializing the response.
     #[error("{0}")]
     Response(reqwest::Error),
 
@@ -38,6 +39,7 @@ pub enum SearchError {
 
 /// Errors encoding request bodies or decoding response bodies.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum CodecError {
     /// The request body could not be serialized.
     #[error("Failed to encode the request: {0}")]
