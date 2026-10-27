@@ -20,6 +20,16 @@ pub enum SearchError {
     #[error(transparent)]
     Codec(#[from] CodecError),
 
+    /// Non-successful HTTP status whose body is not a Vespa error response.
+    /// Usually comes from a proxy, a load balancer or an overloaded container
+    #[error("Unexpected HTTP status {status}")]
+    Status {
+        /// Status code of the response.
+        status: http::StatusCode,
+        /// Raw body of the response.
+        body: Vec<u8>,
+    },
+
     /// Errors returned inside the Vespa response.
     /// Commonly related to some error in Vespa query, schemas or Searchers.
     #[error("Errors in Vespa search response, first error: {} - {}", .0[0].code, .0[0].summary)]
