@@ -28,7 +28,7 @@ struct Extension<'a> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let vespa = Vespa::new("http://localhost:8080".to_string());
+    let vespa = Vespa::new("http://localhost:8080")?;
     let response: Response<Document> = vespa
         .search(&Request::<Extension> {
             yql: "select title, body from doc where userQuery()",

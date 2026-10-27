@@ -2,13 +2,12 @@
 //!
 //! This is an independent community project, not affiliated with or endorsed by Vespa.ai.
 
-use http::{
-    HeaderMap, HeaderName, HeaderValue,
-    header::{AUTHORIZATION, InvalidHeaderValue},
-};
 use std::time::Duration;
 
-use reqwest::{Client, ClientBuilder, Identity};
+use http::{HeaderMap, HeaderName, HeaderValue, header::AUTHORIZATION};
+use reqwest::{Client, ClientBuilder, Identity, Url};
+
+use crate::error::BuildError;
 
 pub mod error;
 mod format;
@@ -21,32 +20,63 @@ const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Default time for a whole request, from connecting to reading the full response.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+#[derive(Debug, Clone)]
 pub struct Vespa {
     client: Client,
     search_url: String,
-
-    /// Application format to read Vespa responses
-    pub format: Format,
+    format: Format,
 }
 
 impl Vespa {
-    pub fn new(url: String) -> Self {
+    /// Creates a client with the default configuration.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the URL is not a valid `http` or `https` URL.
+    pub fn new(url: impl Into<String>) -> Result<Self, BuildError> {
         Vespa::builder(url).build()
     }
 
-    pub fn with_client(url: String, client: Client) -> Self {
-        let mut vespa = Vespa::new(url);
-        vespa.client = client;
-        vespa
+    /// Creates a client that sends the requests with the provided HTTP client, which
+    /// keeps its own configuration (timeouts, identity, headers, HTTP version...).
+    ///
+    /// # Errors
+    ///
+    /// Fails if the URL is not a valid `http` or `https` URL.
+    pub fn with_client(url: impl Into<String>, client: Client) -> Result<Self, BuildError> {
+        Ok(Vespa {
+            client,
+            search_url: search_url(url.into())?,
+            format: Format::default(),
+        })
     }
 
-    pub fn builder(url: String) -> VespaBuilder {
+    pub fn builder(url: impl Into<String>) -> VespaBuilder {
         VespaBuilder::new(url)
     }
 }
 
+/// Validates the base URL and returns the one of the search endpoint.
+fn search_url(url: String) -> Result<String, BuildError> {
+    let invalid = |reason: &str| BuildError::InvalidUrl {
+        url: url.clone(),
+        reason: reason.to_string(),
+    };
+    let parsed = Url::parse(&url).map_err(|e| invalid(&e.to_string()))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(invalid("the scheme must be http or https"));
+    }
+    if parsed.host_str().is_none() {
+        return Err(invalid("the URL has no host"));
+    }
+    Ok(format!("{}/search/", url.trim_end_matches('/')))
+}
+
+/// Builder of [`Vespa`] clients. The errors of its methods are reported by [`build`](Self::build).
+#[derive(Debug)]
 pub struct VespaBuilder {
     url: String,
+    error: Option<BuildError>,
     client: ClientBuilder,
     format: Format,
     headers: HeaderMap,
@@ -56,13 +86,10 @@ pub struct VespaBuilder {
 }
 
 impl VespaBuilder {
-    pub fn new(mut url: String) -> Self {
-        while url.ends_with("/") {
-            url.remove(url.len() - 1);
-        }
-
+    pub fn new(url: impl Into<String>) -> Self {
         Self {
-            url,
+            url: url.into(),
+            error: None,
             client: Client::builder(),
             format: Format::default(),
             headers: HeaderMap::new(),
@@ -70,6 +97,11 @@ impl VespaBuilder {
             connect_timeout: DEFAULT_CONNECT_TIMEOUT,
             timeout: DEFAULT_TIMEOUT,
         }
+    }
+
+    /// Keeps the first error to report it when building.
+    fn record(&mut self, error: impl Into<BuildError>) {
+        self.error.get_or_insert(error.into());
     }
 
     pub fn identity(mut self, identity: Identity) -> Self {
@@ -80,31 +112,32 @@ impl VespaBuilder {
     /// Sets the mTLS identity from PEM encoded certificate and private key, for example
     /// when they are read from environment variables instead of files.
     ///
-    /// # Errors
-    ///
-    /// Fails if the certificate or the key are not valid PEM.
-    pub fn client_pem(mut self, cert: &[u8], key: &[u8]) -> Result<Self, reqwest::Error> {
+    pub fn client_pem(mut self, cert: &[u8], key: &[u8]) -> Self {
         let mut pem = Vec::with_capacity(cert.len() + key.len() + 1);
         pem.extend_from_slice(cert);
         if !cert.ends_with(b"\n") {
             pem.push(b'\n');
         }
         pem.extend_from_slice(key);
-        self.client = self.client.identity(Identity::from_pem(&pem)?);
-        Ok(self)
+        match Identity::from_pem(&pem) {
+            Ok(identity) => self.client = self.client.identity(identity),
+            Err(e) => self.record(BuildError::Identity(e)),
+        }
+        self
     }
 
     /// Authenticates every request with a bearer token, such as a Vespa Cloud data plane
     /// token. The header is marked as sensitive so it is left out of debug output.
     ///
-    /// # Errors
-    ///
-    /// Fails if the token contains characters that are not valid in a header value.
-    pub fn bearer_token(mut self, token: &str) -> Result<Self, InvalidHeaderValue> {
-        let mut value = HeaderValue::from_str(&format!("Bearer {token}"))?;
-        value.set_sensitive(true);
-        self.headers.insert(AUTHORIZATION, value);
-        Ok(self)
+    pub fn bearer_token(mut self, token: &str) -> Self {
+        match HeaderValue::from_str(&format!("Bearer {token}")) {
+            Ok(mut value) => {
+                value.set_sensitive(true);
+                self.headers.insert(AUTHORIZATION, value);
+            }
+            Err(e) => self.record(e),
+        }
+        self
     }
 
     /// Adds a header sent with every request, replacing any previous value for that name.
@@ -159,7 +192,18 @@ impl VespaBuilder {
         self
     }
 
-    pub fn build(self) -> Vespa {
+    /// Builds the client.
+    ///
+    /// # Errors
+    ///
+    /// Fails with the first error found in the configuration, such as an invalid URL,
+    /// token or identity.
+    pub fn build(self) -> Result<Vespa, BuildError> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
+        let search_url = search_url(self.url)?;
+
         let client = self
             .client
             .user_agent(self.user_agent)
@@ -167,15 +211,13 @@ impl VespaBuilder {
             .connect_timeout(self.connect_timeout)
             .timeout(self.timeout)
             .build()
-            .expect("clients built with the builder to be always correct");
+            .map_err(BuildError::Client)?;
 
-        let search_url = format!("{}/search/", self.url);
-
-        Vespa {
+        Ok(Vespa {
             client,
             search_url,
             format: self.format,
-        }
+        })
     }
 }
 

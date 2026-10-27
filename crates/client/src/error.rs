@@ -48,3 +48,29 @@ pub enum CodecError {
     #[error("Failed to decode the response: {0}")]
     Decode(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
+
+/// Errors building a [`Vespa`](crate::Vespa) client.
+#[derive(Error, Debug)]
+#[non_exhaustive]
+pub enum BuildError {
+    /// The URL is not a valid `http` or `https` URL with a host.
+    #[error("Invalid URL {url:?}: {reason}")]
+    InvalidUrl {
+        /// The URL as provided.
+        url: String,
+        /// Why it was rejected.
+        reason: String,
+    },
+
+    /// A header, or a token used to build one, is not a valid header value.
+    #[error("Invalid header value: {0}")]
+    InvalidHeader(#[from] http::header::InvalidHeaderValue),
+
+    /// The certificate or the key of the client identity are not valid PEM.
+    #[error("Invalid client identity: {0}")]
+    Identity(#[source] reqwest::Error),
+
+    /// The underlying HTTP client could not be built.
+    #[error("Failed to build the HTTP client: {0}")]
+    Client(#[source] reqwest::Error),
+}
