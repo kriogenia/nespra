@@ -28,7 +28,9 @@ impl Vespa {
     ///
     /// # Errors
     ///
-    /// Any of `nespra::error::SearchError`.
+    /// Any of `nespra::error::SearchError`. A non-successful HTTP status is reported as
+    /// `SearchError::Vespa` when the body carries Vespa errors, and as
+    /// `SearchError::Status` with the raw body otherwise.
     pub async fn search<B: Serialize + ?Sized, H: DeserializeOwned>(
         &self,
         body: &B,
@@ -41,16 +43,33 @@ impl Vespa {
             .body(encode_request(body)?)
             .send()
             .await
-            .map_err(SearchError::Request)?
-            .bytes()
-            .await
-            .map_err(SearchError::Response)?;
-        let response: Response<H> = self.format.decode(&response)?;
+            .map_err(SearchError::Request)?;
 
-        if response.root.errors.is_empty() {
+        let status = response.status();
+        let bytes = response.bytes().await.map_err(SearchError::Response)?;
+
+        let response: Response<H> = match self.format.decode(&bytes) {
+            Ok(response) => response,
+            Err(_) if !status.is_success() => {
+                return Err(SearchError::Status {
+                    status,
+                    body: bytes.to_vec(),
+                });
+            }
+            Err(e) => return Err(e.into()),
+        };
+
+        if !response.root.errors.is_empty() {
+            return Err(SearchError::Vespa(response.root.errors));
+        }
+
+        if status.is_success() {
             Ok(response)
         } else {
-            Err(SearchError::Vespa(response.root.errors))
+            Err(SearchError::Status {
+                status,
+                body: bytes.to_vec(),
+            })
         }
     }
 }
