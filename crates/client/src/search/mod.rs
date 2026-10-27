@@ -36,7 +36,6 @@ impl Vespa {
         let response = self
             .client
             .post(&self.search_url)
-            // TODO: .version(Version::HTTP_2)
             .header(CONTENT_TYPE, "application/json")
             .header(ACCEPT, self.format.mime())
             .body(encode_request(body)?)

@@ -24,8 +24,6 @@ let response: Response<Value> = vespa
     .await?;
 ```
 
-Responses are requested in CBOR by default, which needs Vespa 8.623.5 or later. Use `Vespa::new(url).format(Format::Json)` to request JSON from older versions. Requests are always sent as JSON.
-
 ## Releasing
 
 Releases are automated with [release-plz](https://release-plz.dev):
