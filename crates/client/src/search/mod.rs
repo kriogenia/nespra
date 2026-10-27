@@ -9,7 +9,7 @@ use std::time::Duration;
 use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{Vespa, error::SearchError, format::encode_request};
+use crate::{Format, Vespa, error::SearchError, format::encode_request};
 
 /// Options for a single search call, see [`Vespa::search_with`].
 #[derive(Debug, Clone, Default)]
@@ -17,6 +17,8 @@ use crate::{Vespa, error::SearchError, format::encode_request};
 pub struct SearchOptions {
     /// Overrides the client timeout for this call only.
     pub timeout: Option<Duration>,
+    /// Overrides the format used to read the response for this call only.
+    pub format: Option<Format>,
 }
 
 impl SearchOptions {
@@ -27,6 +29,12 @@ impl SearchOptions {
     /// Overrides the client timeout for this call only.
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
+        self
+    }
+
+    /// Overrides the format used to read the response for this call only.
+    pub fn format(mut self, format: Format) -> Self {
+        self.format = Some(format);
         self
     }
 }
@@ -66,11 +74,12 @@ impl Vespa {
         body: &B,
         options: &SearchOptions,
     ) -> Result<Response<H>, SearchError> {
+        let format = options.format.unwrap_or(self.format);
         let mut request = self
             .client
             .post(&self.search_url)
             .header(CONTENT_TYPE, "application/json")
-            .header(ACCEPT, self.format.mime())
+            .header(ACCEPT, format.mime())
             .body(encode_request(body)?);
 
         if let Some(timeout) = options.timeout {
@@ -82,7 +91,7 @@ impl Vespa {
         let status = response.status();
         let bytes = response.bytes().await.map_err(SearchError::Response)?;
 
-        let response: Response<H> = match self.format.decode(&bytes) {
+        let response: Response<H> = match format.decode(&bytes) {
             Ok(response) => response,
             Err(_) if !status.is_success() => {
                 return Err(SearchError::Status {
