@@ -2,6 +2,10 @@
 //!
 //! This is an independent community project, not affiliated with or endorsed by Vespa.ai.
 
+use http::{
+    HeaderMap, HeaderName, HeaderValue,
+    header::{AUTHORIZATION, InvalidHeaderValue},
+};
 use reqwest::{Client, ClientBuilder, Identity};
 
 pub mod error;
@@ -38,6 +42,8 @@ pub struct VespaBuilder {
     url: String,
     client: ClientBuilder,
     format: Format,
+    headers: HeaderMap,
+    user_agent: HeaderValue,
 }
 
 impl VespaBuilder {
@@ -50,11 +56,61 @@ impl VespaBuilder {
             url,
             client: Client::builder(),
             format: Format::default(),
+            headers: HeaderMap::new(),
+            user_agent: HeaderValue::from_static(concat!("nespra/", env!("CARGO_PKG_VERSION"))),
         }
     }
 
     pub fn identity(mut self, identity: Identity) -> Self {
         self.client = self.client.identity(identity);
+        self
+    }
+
+    /// Sets the mTLS identity from PEM encoded certificate and private key, for example
+    /// when they are read from environment variables instead of files.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the certificate or the key are not valid PEM.
+    pub fn client_pem(mut self, cert: &[u8], key: &[u8]) -> Result<Self, reqwest::Error> {
+        let mut pem = Vec::with_capacity(cert.len() + key.len() + 1);
+        pem.extend_from_slice(cert);
+        if !cert.ends_with(b"\n") {
+            pem.push(b'\n');
+        }
+        pem.extend_from_slice(key);
+        self.client = self.client.identity(Identity::from_pem(&pem)?);
+        Ok(self)
+    }
+
+    /// Authenticates every request with a bearer token, such as a Vespa Cloud data plane
+    /// token. The header is marked as sensitive so it is left out of debug output.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the token contains characters that are not valid in a header value.
+    pub fn bearer_token(mut self, token: &str) -> Result<Self, InvalidHeaderValue> {
+        let mut value = HeaderValue::from_str(&format!("Bearer {token}"))?;
+        value.set_sensitive(true);
+        self.headers.insert(AUTHORIZATION, value);
+        Ok(self)
+    }
+
+    /// Adds a header sent with every request, replacing any previous value for that name.
+    pub fn header(mut self, name: HeaderName, value: HeaderValue) -> Self {
+        self.headers.insert(name, value);
+        self
+    }
+
+    /// Adds the headers sent with every request, replacing any previous value for the same names.
+    pub fn default_headers(mut self, headers: HeaderMap) -> Self {
+        self.headers.extend(headers);
+        self
+    }
+
+    /// Sets the `User-Agent` of the requests, `nespra/<version>` by default.
+    pub fn user_agent(mut self, user_agent: HeaderValue) -> Self {
+        self.user_agent = user_agent;
         self
     }
 
@@ -78,6 +134,8 @@ impl VespaBuilder {
     pub fn build(self) -> Vespa {
         let client = self
             .client
+            .user_agent(self.user_agent)
+            .default_headers(self.headers)
             .build()
             .expect("clients built with the builder to be always correct");
 
