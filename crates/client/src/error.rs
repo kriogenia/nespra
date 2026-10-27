@@ -38,3 +38,10 @@ pub enum CodecError {
     #[error("Failed to decode the response: {0}")]
     Decode(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
+
+#[derive(Error, Debug)]
+pub enum BuildingError {
+    /// The client requires the URL pointing to the Vespa server
+    #[error("Client requires at least an URL")]
+    MissingUrl,
+}

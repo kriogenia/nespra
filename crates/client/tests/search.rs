@@ -13,20 +13,23 @@ struct Fields {
     body: String,
 }
 
-fn vespa(format: Format) -> Vespa {
-    Vespa::new("http://localhost:8080".to_string()).format(format)
+fn vespa() -> Vespa {
+    Vespa::new("http://localhost:8080".to_string())
 }
 
 #[ignore]
 #[tokio::test]
-async fn test_search_success_cbor() {
-    search_success(vespa(Format::Cbor)).await;
+async fn test_search_success() {
+    search_success(vespa()).await;
 }
 
 #[ignore]
 #[tokio::test]
 async fn test_search_success_json() {
-    search_success(vespa(Format::Json)).await;
+    let mut vespa = vespa();
+    vespa.format = Format::Json;
+
+    search_success(vespa).await;
 }
 
 async fn search_success(vespa: Vespa) {
