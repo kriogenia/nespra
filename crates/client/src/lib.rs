@@ -15,6 +15,10 @@ pub mod search;
 
 pub use format::Format;
 
+/// The HTTP client library used by nespra. Re-exported so the `Client`, `Identity` and
+/// other types accepted by the builders are always the ones of the version nespra uses.
+pub use reqwest;
+
 /// Default time to establish a connection.
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Default time for a whole request, from connecting to reading the full response.
