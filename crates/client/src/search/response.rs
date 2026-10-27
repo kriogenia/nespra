@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct Response<T> {
     pub root: Root<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -36,6 +37,7 @@ impl<T> Response<T> {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct Root<T> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
@@ -72,12 +74,14 @@ pub struct Root<T> {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct Limits {
     pub from: String,
     pub to: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 #[serde(rename_all = "camelCase")]
 pub struct Fields {
     pub total_count: i32,
@@ -86,6 +90,7 @@ pub struct Fields {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 #[serde(rename_all = "camelCase")]
 pub struct Coverage {
     pub coverage: u8,
@@ -99,6 +104,7 @@ pub struct Coverage {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 #[serde(rename_all = "kebab-case")]
 pub struct Degraded {
     pub match_phase: bool,
@@ -110,6 +116,7 @@ pub struct Degraded {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 #[serde(rename_all = "camelCase")]
 pub struct Error {
     pub code: i32,
@@ -123,6 +130,7 @@ pub struct Error {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct Timing {
     #[serde(rename = "querytime", skip_serializing_if = "Option::is_none")]
     pub query_time: Option<f64>,

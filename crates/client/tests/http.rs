@@ -27,20 +27,30 @@ async fn first_bytes(build: impl FnOnce(String) -> Vespa) -> Vec<u8> {
 
 #[tokio::test]
 async fn test_http2() {
-    let bytes =
-        first_bytes(|url| Vespa::builder(url).http_version(HttpVersion::Http2).build()).await;
+    let bytes = first_bytes(|url| {
+        Vespa::builder(url)
+            .http_version(HttpVersion::Http2)
+            .build()
+            .unwrap()
+    })
+    .await;
     assert_eq!(bytes, H2_PREFACE);
 }
 
 #[tokio::test]
 async fn test_http1() {
-    let bytes =
-        first_bytes(|url| Vespa::builder(url).http_version(HttpVersion::Http1).build()).await;
+    let bytes = first_bytes(|url| {
+        Vespa::builder(url)
+            .http_version(HttpVersion::Http1)
+            .build()
+            .unwrap()
+    })
+    .await;
     assert!(bytes.starts_with(H1_REQUEST));
 }
 
 #[tokio::test]
 async fn test_custom_client_uses_its_own_configuration() {
-    let bytes = first_bytes(|url| Vespa::with_client(url, Client::new())).await;
+    let bytes = first_bytes(|url| Vespa::with_client(url, Client::new()).unwrap()).await;
     assert!(bytes.starts_with(H1_REQUEST));
 }

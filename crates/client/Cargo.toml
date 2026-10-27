@@ -10,6 +10,14 @@ readme = "../../README.md"
 keywords = ["vespa", "search", "client", "cbor", "async"]
 categories = ["api-bindings", "asynchronous"]
 
+[features]
+default = ["request-models"]
+request-models = []
+
+[[example]]
+name = "models"
+required-features = ["request-models"]
+
 [dependencies]
 ciborium = "0.2.2"
 http = "1.5.0"

@@ -1,15 +1,17 @@
+#[cfg(feature = "request-models")]
 mod request;
 mod response;
 
+#[cfg(feature = "request-models")]
 pub use request::*;
-pub use response::*; // TODO: hide behind feature
+pub use response::*;
 
 use std::time::Duration;
 
 use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{Vespa, error::SearchError, format::encode_request};
+use crate::{Format, Vespa, error::SearchError, format::encode_request};
 
 /// Options for a single search call, see [`Vespa::search_with`].
 #[derive(Debug, Clone, Default)]
@@ -17,6 +19,8 @@ use crate::{Vespa, error::SearchError, format::encode_request};
 pub struct SearchOptions {
     /// Overrides the client timeout for this call only.
     pub timeout: Option<Duration>,
+    /// Overrides the format used to read the response for this call only.
+    pub format: Option<Format>,
 }
 
 impl SearchOptions {
@@ -29,6 +33,12 @@ impl SearchOptions {
         self.timeout = Some(timeout);
         self
     }
+
+    /// Overrides the format used to read the response for this call only.
+    pub fn format(mut self, format: Format) -> Self {
+        self.format = Some(format);
+        self
+    }
 }
 
 impl Vespa {
@@ -38,13 +48,13 @@ impl Vespa {
     /// # Request
     ///
     /// Can be any serializable object, always sent as JSON. This means that you can use the
-    /// helping `search::Request` struct, a `json!` invokation or use a custom struct
-    /// implementating Serialize.
+    /// helping `search::Request` struct, a `json!` invocation or use a custom struct
+    /// implementing Serialize.
     ///
     /// # Response
     ///
     /// Must be deserializable representation of the documents returned in the
-    /// response. The rest of fields are already implemented in the the `search::Response`
+    /// response. The rest of fields are already implemented in the `search::Response`
     /// model. In case that you want a simple object you can just use a `json::Value` or
     /// any other generic type.
     ///
@@ -66,11 +76,12 @@ impl Vespa {
         body: &B,
         options: &SearchOptions,
     ) -> Result<Response<H>, SearchError> {
+        let format = options.format.unwrap_or(self.format);
         let mut request = self
             .client
             .post(&self.search_url)
             .header(CONTENT_TYPE, "application/json")
-            .header(ACCEPT, self.format.mime())
+            .header(ACCEPT, format.mime())
             .body(encode_request(body)?);
 
         if let Some(timeout) = options.timeout {
@@ -82,7 +93,7 @@ impl Vespa {
         let status = response.status();
         let bytes = response.bytes().await.map_err(SearchError::Response)?;
 
-        let response: Response<H> = match self.format.decode(&bytes) {
+        let response: Response<H> = match format.decode(&bytes) {
             Ok(response) => response,
             Err(_) if !status.is_success() => {
                 return Err(SearchError::Status {

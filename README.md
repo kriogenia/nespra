@@ -15,7 +15,7 @@ Unofficial async Rust client for [Vespa](https://vespa.ai), the open-source sear
 use nespra::{Vespa, search::Response};
 use serde_json::{Value, json};
 
-let vespa = Vespa::new("http://localhost:8080".to_string());
+let vespa = Vespa::new("http://localhost:8080")?;
 let response: Response<Value> = vespa
     .search(&json!({
         "yql": "select title, body from doc where userQuery()",

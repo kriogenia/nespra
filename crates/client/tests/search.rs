@@ -14,7 +14,7 @@ struct Fields {
 }
 
 fn vespa() -> Vespa {
-    Vespa::new("http://localhost:8080".to_string())
+    Vespa::new("http://localhost:8080").unwrap()
 }
 
 #[ignore]
@@ -26,8 +26,10 @@ async fn test_search_success() {
 #[ignore]
 #[tokio::test]
 async fn test_search_success_json() {
-    let mut vespa = vespa();
-    vespa.format = Format::Json;
+    let vespa = Vespa::builder("http://localhost:8080")
+        .format(Format::Json)
+        .build()
+        .unwrap();
 
     search_success(vespa).await;
 }

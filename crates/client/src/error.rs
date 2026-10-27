@@ -1,7 +1,8 @@
 use thiserror::Error;
 
-/// Errors that can during API requests
+/// Errors that can happen during API requests
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum SearchError {
     /// Error triggered while building and sending the HTTP request.
     /// Some common errors bundled on this one are:
@@ -12,7 +13,7 @@ pub enum SearchError {
     Request(reqwest::Error),
 
     /// Error triggered while handling the HTTP response.
-    /// Usually a problem while deserializing the resposne.
+    /// Usually a problem while deserializing the response.
     #[error("{0}")]
     Response(reqwest::Error),
 
@@ -38,6 +39,7 @@ pub enum SearchError {
 
 /// Errors encoding request bodies or decoding response bodies.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum CodecError {
     /// The request body could not be serialized.
     #[error("Failed to encode the request: {0}")]
@@ -47,4 +49,30 @@ pub enum CodecError {
     /// cause is a Vespa version older than 8.623.5 answering with JSON.
     #[error("Failed to decode the response: {0}")]
     Decode(#[source] Box<dyn std::error::Error + Send + Sync>),
+}
+
+/// Errors building a [`Vespa`](crate::Vespa) client.
+#[derive(Error, Debug)]
+#[non_exhaustive]
+pub enum BuildError {
+    /// The URL is not a valid `http` or `https` URL with a host.
+    #[error("Invalid URL {url:?}: {reason}")]
+    InvalidUrl {
+        /// The URL as provided.
+        url: String,
+        /// Why it was rejected.
+        reason: String,
+    },
+
+    /// A header, or a token used to build one, is not a valid header value.
+    #[error("Invalid header value: {0}")]
+    InvalidHeader(#[from] http::header::InvalidHeaderValue),
+
+    /// The certificate or the key of the client identity are not valid PEM.
+    #[error("Invalid client identity: {0}")]
+    Identity(#[source] reqwest::Error),
+
+    /// The underlying HTTP client could not be built.
+    #[error("Failed to build the HTTP client: {0}")]
+    Client(#[source] reqwest::Error),
 }
