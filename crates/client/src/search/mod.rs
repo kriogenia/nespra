@@ -1,6 +1,8 @@
+#[cfg(feature = "request-models")]
 mod request;
 mod response;
 
+#[cfg(feature = "request-models")]
 pub use request::*;
 pub use response::*; // TODO: hide behind feature
 
@@ -46,13 +48,13 @@ impl Vespa {
     /// # Request
     ///
     /// Can be any serializable object, always sent as JSON. This means that you can use the
-    /// helping `search::Request` struct, a `json!` invokation or use a custom struct
-    /// implementating Serialize.
+    /// helping `search::Request` struct, a `json!` invocation or use a custom struct
+    /// implementing Serialize.
     ///
     /// # Response
     ///
     /// Must be deserializable representation of the documents returned in the
-    /// response. The rest of fields are already implemented in the the `search::Response`
+    /// response. The rest of fields are already implemented in the `search::Response`
     /// model. In case that you want a simple object you can just use a `json::Value` or
     /// any other generic type.
     ///
