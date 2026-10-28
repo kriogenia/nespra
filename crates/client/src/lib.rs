@@ -1,6 +1,12 @@
 //! Unofficial async client for [Vespa](https://vespa.ai).
 //!
 //! This is an independent community project, not affiliated with or endorsed by Vespa.ai.
+//!
+//! # Features
+//!
+//! - `request-models` (default): helper models to build search requests.
+//! - `gzip` (default): asks Vespa for gzip compressed responses and decompresses them.
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::time::Duration;
 
