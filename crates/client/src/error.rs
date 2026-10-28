@@ -37,6 +37,26 @@ pub enum SearchError {
     Vespa(Vec<crate::search::Error>),
 }
 
+/// Vespa error codes of failures that usually go away on their own:
+/// `NO_BACKENDS_IN_SERVICE`, `BACKEND_COMMUNICATION_ERROR` and `TIMEOUT`.
+const TRANSIENT_VESPA_CODES: [i32; 3] = [0, 10, 12];
+
+impl SearchError {
+    /// Whether repeating the search can succeed: connection failures, HTTP 429, 502, 503
+    /// and 504, and Vespa errors about unavailable backends, backend communication
+    /// or timeouts. Useful to implement a custom retry policy.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            SearchError::Request(e) => !e.is_builder() && !e.is_timeout() && !e.is_redirect(),
+            SearchError::Status { status, .. } => matches!(status.as_u16(), 429 | 502..=504),
+            SearchError::Vespa(errors) => errors
+                .iter()
+                .any(|e| TRANSIENT_VESPA_CODES.contains(&e.code)),
+            SearchError::Response(_) | SearchError::Codec(_) => false,
+        }
+    }
+}
+
 /// Errors encoding request bodies or decoding response bodies.
 #[derive(Error, Debug)]
 #[non_exhaustive]

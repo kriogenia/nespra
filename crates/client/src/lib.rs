@@ -17,9 +17,11 @@ use crate::error::BuildError;
 
 pub mod error;
 mod format;
+mod retry;
 pub mod search;
 
 pub use format::Format;
+pub use retry::RetryPolicy;
 
 /// The HTTP client library used by nespra. Re-exported so the `Client`, `Identity` and
 /// other types accepted by the builders are always the ones of the version nespra uses.
@@ -35,6 +37,7 @@ pub struct Vespa {
     client: Client,
     search_url: String,
     format: Format,
+    retry: RetryPolicy,
 }
 
 impl Vespa {
@@ -58,6 +61,7 @@ impl Vespa {
             client,
             search_url: search_url(url.into())?,
             format: Format::default(),
+            retry: RetryPolicy::default(),
         })
     }
 
@@ -93,6 +97,7 @@ pub struct VespaBuilder {
     user_agent: HeaderValue,
     connect_timeout: Duration,
     timeout: Duration,
+    retry: RetryPolicy,
 }
 
 impl VespaBuilder {
@@ -106,6 +111,7 @@ impl VespaBuilder {
             user_agent: HeaderValue::from_static(concat!("nespra/", env!("CARGO_PKG_VERSION"))),
             connect_timeout: DEFAULT_CONNECT_TIMEOUT,
             timeout: DEFAULT_TIMEOUT,
+            retry: RetryPolicy::default(),
         }
     }
 
@@ -185,6 +191,14 @@ impl VespaBuilder {
         self
     }
 
+    /// Sets how failed searches are retried, up to 3 attempts by default. Use
+    /// [`RetryPolicy::none`] to disable it. It can be overridden per request with
+    /// [`Vespa::search_with`].
+    pub fn retry(mut self, retry: RetryPolicy) -> Self {
+        self.retry = retry;
+        self
+    }
+
     pub fn format(mut self, format: Format) -> Self {
         self.format = format;
         self
@@ -227,6 +241,7 @@ impl VespaBuilder {
             client,
             search_url,
             format: self.format,
+            retry: self.retry,
         })
     }
 }
