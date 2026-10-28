@@ -9,10 +9,10 @@ pub use response::*;
 
 use std::time::Duration;
 
-use reqwest::header::{ACCEPT, CONTENT_TYPE};
+use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, RETRY_AFTER};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{Format, Vespa, error::SearchError, format::encode_request};
+use crate::{Format, RetryPolicy, Vespa, error::SearchError, format::encode_request};
 
 /// Options for a single search call, see [`Vespa::search_with`].
 #[derive(Debug, Clone, Default)]
@@ -22,6 +22,8 @@ pub struct SearchOptions {
     pub timeout: Option<Duration>,
     /// Overrides the format used to read the response for this call only.
     pub format: Option<Format>,
+    /// Overrides the retry policy for this call only.
+    pub retry: Option<RetryPolicy>,
 }
 
 impl SearchOptions {
@@ -38,6 +40,12 @@ impl SearchOptions {
     /// Overrides the format used to read the response for this call only.
     pub fn format(mut self, format: Format) -> Self {
         self.format = Some(format);
+        self
+    }
+
+    /// Overrides the retry policy for this call only.
+    pub fn retry(mut self, retry: RetryPolicy) -> Self {
+        self.retry = Some(retry);
         self
     }
 }
@@ -72,18 +80,42 @@ impl Vespa {
     }
 
     /// Same as [`Vespa::search`] with options that apply to this call only.
+    ///
+    /// Transient failures are retried following the retry policy, see
+    /// [`SearchError::is_retryable`]. The timeout applies to each attempt.
     pub async fn search_with<B: Serialize + ?Sized, H: DeserializeOwned>(
         &self,
         body: &B,
         options: &SearchOptions,
     ) -> Result<Response<H>, SearchError> {
+        let body = encode_request(body)?;
+        let policy = options.retry.unwrap_or(self.retry);
+
+        let mut attempt = 1;
+        loop {
+            match self.search_once(&body, options).await {
+                Err(failure) if attempt < policy.max_attempts && failure.error.is_retryable() => {
+                    let wait = policy.backoff(attempt - 1, failure.retry_after);
+                    tokio::time::sleep(wait).await;
+                    attempt += 1;
+                }
+                result => return result.map_err(|failure| failure.error),
+            }
+        }
+    }
+
+    async fn search_once<H: DeserializeOwned>(
+        &self,
+        body: &[u8],
+        options: &SearchOptions,
+    ) -> Result<Response<H>, Failure> {
         let format = options.format.unwrap_or(self.format);
         let mut request = self
             .client
             .post(&self.search_url)
             .header(CONTENT_TYPE, "application/json")
             .header(ACCEPT, format.mime())
-            .body(encode_request(body)?);
+            .body(body.to_vec());
 
         if let Some(timeout) = options.timeout {
             request = request.timeout(timeout);
@@ -92,30 +124,60 @@ impl Vespa {
         let response = request.send().await.map_err(SearchError::Request)?;
 
         let status = response.status();
+        let retry_after = retry_after(response.headers());
         let bytes = response.bytes().await.map_err(SearchError::Response)?;
+
+        let failure = |error: SearchError| Failure { error, retry_after };
 
         let response: Response<H> = match format.decode(&bytes) {
             Ok(response) => response,
             Err(_) if !status.is_success() => {
-                return Err(SearchError::Status {
+                return Err(failure(SearchError::Status {
                     status,
                     body: bytes.to_vec(),
-                });
+                }));
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(failure(e.into())),
         };
 
         if !response.root.errors.is_empty() {
-            return Err(SearchError::Vespa(response.root.errors));
+            return Err(failure(SearchError::Vespa(response.root.errors)));
         }
 
         if status.is_success() {
             Ok(response)
         } else {
-            Err(SearchError::Status {
+            Err(failure(SearchError::Status {
                 status,
                 body: bytes.to_vec(),
-            })
+            }))
         }
     }
+}
+
+/// Failed attempt, with the wait requested by the server if any.
+struct Failure {
+    error: SearchError,
+    retry_after: Option<Duration>,
+}
+
+impl From<SearchError> for Failure {
+    fn from(error: SearchError) -> Self {
+        Failure {
+            error,
+            retry_after: None,
+        }
+    }
+}
+
+/// Reads a `Retry-After` header expressed in seconds, the date form is ignored.
+fn retry_after(headers: &HeaderMap) -> Option<Duration> {
+    headers
+        .get(RETRY_AFTER)?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse()
+        .ok()
+        .map(Duration::from_secs)
 }
