@@ -181,3 +181,27 @@ fn retry_after(headers: &HeaderMap) -> Option<Duration> {
         .ok()
         .map(Duration::from_secs)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn headers(value: &'static str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(RETRY_AFTER, value.parse().unwrap());
+        headers
+    }
+
+    #[test]
+    fn test_retry_after_in_seconds() {
+        assert_eq!(retry_after(&headers("3")), Some(Duration::from_secs(3)));
+        assert_eq!(retry_after(&headers(" 10 ")), Some(Duration::from_secs(10)));
+    }
+
+    #[test]
+    fn test_retry_after_ignores_other_forms() {
+        assert_eq!(retry_after(&headers("Wed, 21 Oct 2026 07:28:00 GMT")), None);
+        assert_eq!(retry_after(&headers("soon")), None);
+        assert_eq!(retry_after(&HeaderMap::new()), None);
+    }
+}
