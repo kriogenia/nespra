@@ -96,3 +96,66 @@ pub enum BuildError {
     #[error("Failed to build the HTTP client: {0}")]
     Client(#[source] reqwest::Error),
 }
+
+#[cfg(test)]
+mod test {
+    use http::StatusCode;
+
+    use super::*;
+    use crate::search;
+
+    fn vespa_error(code: i32) -> SearchError {
+        SearchError::Vespa(vec![search::Error {
+            code,
+            summary: "failed".to_string(),
+            source: None,
+            message: None,
+            stack_trace: None,
+        }])
+    }
+
+    fn status(status: StatusCode) -> SearchError {
+        SearchError::Status {
+            status,
+            body: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn test_retryable_statuses() {
+        for code in [429, 502, 503, 504] {
+            assert!(status(StatusCode::from_u16(code).unwrap()).is_retryable());
+        }
+        for code in [400, 401, 403, 404, 500, 501] {
+            assert!(!status(StatusCode::from_u16(code).unwrap()).is_retryable());
+        }
+    }
+
+    #[test]
+    fn test_retryable_vespa_errors() {
+        // NO_BACKENDS_IN_SERVICE, BACKEND_COMMUNICATION_ERROR and TIMEOUT
+        for code in [0, 10, 12] {
+            assert!(vespa_error(code).is_retryable());
+        }
+        // ILLEGAL_QUERY
+        assert!(!vespa_error(3).is_retryable());
+    }
+
+    #[test]
+    fn test_a_transient_error_among_others_is_retryable() {
+        let SearchError::Vespa(mut errors) = vespa_error(3) else {
+            unreachable!()
+        };
+        let SearchError::Vespa(transient) = vespa_error(12) else {
+            unreachable!()
+        };
+        errors.extend(transient);
+        assert!(SearchError::Vespa(errors).is_retryable());
+    }
+
+    #[test]
+    fn test_codec_errors_are_not_retryable() {
+        let error = CodecError::Decode("garbage".into());
+        assert!(!SearchError::Codec(error).is_retryable());
+    }
+}
