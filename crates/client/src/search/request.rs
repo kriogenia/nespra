@@ -141,8 +141,8 @@ fn serialize_timeout<S: Serializer>(
 
 /// Helper model to presentation options in search requests.
 ///
-/// Knowingly evades the `format` option as the client is not designed for any
-/// other format than JSON (for now) and CBOR in the future.
+/// Knowingly evades the `format` option as it would mess with the format specified in the client or
+/// the search call. Use those instead.
 #[derive(Debug, Default, Serialize)]
 pub struct Presentation {
     #[serde(skip_serializing_if = "Option::is_none")]

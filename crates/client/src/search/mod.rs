@@ -1,3 +1,5 @@
+//! Set of functions and models to query Vespa using the `/search` endpoint.
+
 #[cfg(feature = "request-models")]
 mod request;
 mod response;
@@ -54,6 +56,9 @@ impl Vespa {
     /// Runs a search request with the specified body and returns a results
     /// with the modelled response or the search error.
     ///
+    /// Transient failures are retried following the retry policy, see
+    /// [`SearchError::is_retryable`]. The timeout applies to each attempt.
+    ///
     /// # Request
     ///
     /// Can be any serializable object, always sent as JSON. This means that you can use the
@@ -80,9 +85,6 @@ impl Vespa {
     }
 
     /// Same as [`Vespa::search`] with options that apply to this call only.
-    ///
-    /// Transient failures are retried following the retry policy, see
-    /// [`SearchError::is_retryable`]. The timeout applies to each attempt.
     pub async fn search_with<B: Serialize + ?Sized, H: DeserializeOwned>(
         &self,
         body: &B,

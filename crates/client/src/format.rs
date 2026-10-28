@@ -26,6 +26,7 @@ impl Format {
         }
     }
 
+    /// Decodes the sequence of bytes using the specific format.
     pub(crate) fn decode<T: DeserializeOwned>(&self, bytes: &[u8]) -> Result<T, CodecError> {
         match self {
             Format::Cbor => ciborium::from_reader(bytes).map_err(|e| CodecError::Decode(e.into())),
