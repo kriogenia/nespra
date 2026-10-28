@@ -11,8 +11,9 @@ keywords = ["vespa", "search", "client", "cbor", "async"]
 categories = ["api-bindings", "asynchronous"]
 
 [features]
-default = ["request-models"]
+default = ["request-models", "gzip"]
 request-models = []
+gzip = ["reqwest/gzip"]
 
 [[example]]
 name = "models"
@@ -21,10 +22,14 @@ required-features = ["request-models"]
 [dependencies]
 ciborium = "0.2.2"
 http = "1.5.0"
-reqwest = "0.13.4"
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "http2", "charset", "system-proxy"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thiserror = "2.0.20"
 
 [dev-dependencies]
 tokio = { version = "1.53.1", features = ["full"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

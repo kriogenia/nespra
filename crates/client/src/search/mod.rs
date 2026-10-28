@@ -3,6 +3,7 @@ mod request;
 mod response;
 
 #[cfg(feature = "request-models")]
+#[cfg_attr(docsrs, doc(cfg(feature = "request-models")))]
 pub use request::*;
 pub use response::*;
 
