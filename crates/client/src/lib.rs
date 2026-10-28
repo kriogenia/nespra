@@ -32,6 +32,7 @@ const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Default time for a whole request, from connecting to reading the full response.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Client to run requests to Vespa
 #[derive(Debug, Clone)]
 pub struct Vespa {
     client: Client,
@@ -65,6 +66,7 @@ impl Vespa {
         })
     }
 
+    /// Provides a builder to create a tailored client.
     pub fn builder(url: impl Into<String>) -> VespaBuilder {
         VespaBuilder::new(url)
     }
@@ -101,6 +103,8 @@ pub struct VespaBuilder {
 }
 
 impl VespaBuilder {
+    /// Creates a new builder for a client pointing to the specified URL, same as
+    /// [`Vespa::builder`].
     pub fn new(url: impl Into<String>) -> Self {
         Self {
             url: url.into(),
@@ -120,6 +124,7 @@ impl VespaBuilder {
         self.error.get_or_insert(error.into());
     }
 
+    /// Sets the identity using a custom [`reqwest::Identity`].
     pub fn identity(mut self, identity: Identity) -> Self {
         self.client = self.client.identity(identity);
         self
@@ -127,7 +132,6 @@ impl VespaBuilder {
 
     /// Sets the mTLS identity from PEM encoded certificate and private key, for example
     /// when they are read from environment variables instead of files.
-    ///
     pub fn client_pem(mut self, cert: &[u8], key: &[u8]) -> Self {
         let mut pem = Vec::with_capacity(cert.len() + key.len() + 1);
         pem.extend_from_slice(cert);
@@ -144,7 +148,6 @@ impl VespaBuilder {
 
     /// Authenticates every request with a bearer token, such as a Vespa Cloud data plane
     /// token. The header is marked as sensitive so it is left out of debug output.
-    ///
     pub fn bearer_token(mut self, token: &str) -> Self {
         match HeaderValue::from_str(&format!("Bearer {token}")) {
             Ok(mut value) => {
@@ -199,6 +202,8 @@ impl VespaBuilder {
         self
     }
 
+    /// Specifies the format request with the `Accept` header. It defaults to
+    /// `application/cbor` as it is faster, but `application/json` is also supported.
     pub fn format(mut self, format: Format) -> Self {
         self.format = format;
         self

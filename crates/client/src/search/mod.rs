@@ -1,3 +1,5 @@
+//! Set of functions and models to query Vespa using the `/search` endpoint.
+
 #[cfg(feature = "request-models")]
 mod request;
 mod response;
@@ -54,6 +56,9 @@ impl Vespa {
     /// Runs a search request with the specified body and returns a results
     /// with the modelled response or the search error.
     ///
+    /// Transient failures are retried following the retry policy, see
+    /// [`SearchError::is_retryable`]. The timeout applies to each attempt.
+    ///
     /// # Request
     ///
     /// Can be any serializable object, always sent as JSON. This means that you can use the
@@ -80,9 +85,6 @@ impl Vespa {
     }
 
     /// Same as [`Vespa::search`] with options that apply to this call only.
-    ///
-    /// Transient failures are retried following the retry policy, see
-    /// [`SearchError::is_retryable`]. The timeout applies to each attempt.
     pub async fn search_with<B: Serialize + ?Sized, H: DeserializeOwned>(
         &self,
         body: &B,
@@ -180,4 +182,28 @@ fn retry_after(headers: &HeaderMap) -> Option<Duration> {
         .parse()
         .ok()
         .map(Duration::from_secs)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn headers(value: &'static str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(RETRY_AFTER, value.parse().unwrap());
+        headers
+    }
+
+    #[test]
+    fn test_retry_after_in_seconds() {
+        assert_eq!(retry_after(&headers("3")), Some(Duration::from_secs(3)));
+        assert_eq!(retry_after(&headers(" 10 ")), Some(Duration::from_secs(10)));
+    }
+
+    #[test]
+    fn test_retry_after_ignores_other_forms() {
+        assert_eq!(retry_after(&headers("Wed, 21 Oct 2026 07:28:00 GMT")), None);
+        assert_eq!(retry_after(&headers("soon")), None);
+        assert_eq!(retry_after(&HeaderMap::new()), None);
+    }
 }
