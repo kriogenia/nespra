@@ -11,7 +11,11 @@ pub use response::*;
 
 use std::time::Duration;
 
-use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, RETRY_AFTER};
+use bytes::Bytes;
+use reqwest::{
+    StatusCode,
+    header::{ACCEPT, CONTENT_TYPE, HeaderMap, RETRY_AFTER},
+};
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{Format, RetryPolicy, Vespa, error::SearchError, format::encode_request};
@@ -106,12 +110,49 @@ impl Vespa {
         }
     }
 
-    async fn search_once<H: DeserializeOwned>(
+    /// Runs a search request and returns the response as it came, without decoding it.
+    ///
+    /// This is the fastest and most basic way to search, meant for callers that process
+    /// the response themselves, such as bindings to other languages. Compared to
+    /// [`Vespa::search`]:
+    ///
+    /// - the body is already serialized JSON,
+    /// - the response is not decoded nor checked: a non-successful status or the errors
+    ///   inside the Vespa response are not reported, the caller must look at
+    ///   [`RawResponse::status`] and the body,
+    /// - nothing is retried, regardless of the retry policy of the client.
+    ///
+    /// # Errors
+    ///
+    /// Only [`SearchError::Request`] and [`SearchError::Response`], when the request
+    /// could not be sent or the response could not be read.
+    pub async fn search_raw(&self, body: &[u8]) -> Result<RawResponse, SearchError> {
+        self.search_raw_with(body, &SearchOptions::default()).await
+    }
+
+    /// Same as [`Vespa::search_raw`] with options that apply to this call only. The
+    /// `timeout` and `format` options are used, `retry` is ignored.
+    pub async fn search_raw_with(
         &self,
         body: &[u8],
         options: &SearchOptions,
-    ) -> Result<Response<H>, Failure> {
+    ) -> Result<RawResponse, SearchError> {
         let format = options.format.unwrap_or(self.format);
+        let (status, _, body) = self.send(body, options, format).await?;
+        Ok(RawResponse {
+            status,
+            format,
+            body,
+        })
+    }
+
+    /// Sends the request once and reads the whole body, whatever the status.
+    async fn send(
+        &self,
+        body: &[u8],
+        options: &SearchOptions,
+        format: Format,
+    ) -> Result<(StatusCode, Option<Duration>, Bytes), SearchError> {
         let mut request = self
             .client
             .post(&self.search_url)
@@ -124,10 +165,19 @@ impl Vespa {
         }
 
         let response = request.send().await.map_err(SearchError::Request)?;
-
         let status = response.status();
         let retry_after = retry_after(response.headers());
         let bytes = response.bytes().await.map_err(SearchError::Response)?;
+        Ok((status, retry_after, bytes))
+    }
+
+    async fn search_once<H: DeserializeOwned>(
+        &self,
+        body: &[u8],
+        options: &SearchOptions,
+    ) -> Result<Response<H>, Failure> {
+        let format = options.format.unwrap_or(self.format);
+        let (status, retry_after, bytes) = self.send(body, options, format).await?;
 
         let failure = |error: SearchError| Failure { error, retry_after };
 
@@ -155,6 +205,18 @@ impl Vespa {
             }))
         }
     }
+}
+
+/// Response of [`Vespa::search_raw`], not decoded nor checked.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct RawResponse {
+    /// HTTP status of the response, successful or not.
+    pub status: StatusCode,
+    /// Format requested for the body, to know how to decode it.
+    pub format: Format,
+    /// Body exactly as sent by Vespa, already decompressed.
+    pub body: Bytes,
 }
 
 /// Failed attempt, with the wait requested by the server if any.
