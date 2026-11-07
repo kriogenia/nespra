@@ -142,6 +142,24 @@ impl Transport {
         Ok((response.status.as_u16(), PyBytes::new(py, &response.body)))
     }
 
+    /// Same as `request` but returns an awaitable.
+    #[pyo3(signature = (body, timeout = None))]
+    fn request_async<'py>(
+        &self,
+        py: Python<'py>,
+        body: Vec<u8>,
+        timeout: Option<f64>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let options = options(timeout)?;
+        let vespa = self.vespa.clone();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let response = vespa
+                .search_raw_with(&body, &options)
+                .await
+                .map_err(request_error)?;
+            Ok((response.status.as_u16(), response.body.to_vec()))
+        })
+    }
 }
 
 fn options(timeout: Option<f64>) -> PyResult<SearchOptions> {
