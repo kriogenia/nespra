@@ -48,6 +48,11 @@ fn request_error(error: SearchError) -> PyErr {
     err
 }
 
+fn seconds(name: &str, value: f64) -> PyResult<Duration> {
+    Duration::try_from_secs_f64(value)
+        .map_err(|_| build_error(format!("{name} must be a non-negative number of seconds")))
+}
+
 /// Sends raw search requests to Vespa.
 #[pyclass(module = "nespra._core", frozen)]
 struct Transport {
@@ -119,8 +124,32 @@ impl Transport {
         Ok(Self { vespa })
     }
 
+    /// Sends the request and returns `(status, body)`, blocking the thread but not the GIL.
+    #[pyo3(signature = (body, timeout = None))]
+    fn request<'py>(
+        &self,
+        py: Python<'py>,
+        body: &[u8],
+        timeout: Option<f64>,
+    ) -> PyResult<(u16, Bound<'py, PyBytes>)> {
+        let options = options(timeout)?;
+        let response = py
+            .detach(|| {
+                pyo3_async_runtimes::tokio::get_runtime()
+                    .block_on(self.vespa.search_raw_with(body, &options))
+            })
+            .map_err(request_error)?;
+        Ok((response.status.as_u16(), PyBytes::new(py, &response.body)))
+    }
+
 }
 
+fn options(timeout: Option<f64>) -> PyResult<SearchOptions> {
+    let mut options = SearchOptions::new();
+    if let Some(timeout) = timeout {
+        options = options.timeout(seconds("timeout", timeout)?);
+    }
+    Ok(options)
 }
 
 }
