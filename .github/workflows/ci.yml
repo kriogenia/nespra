@@ -84,11 +84,37 @@ jobs:
       # Compile only: running them needs a Vespa instance
       - run: cargo build --workspace --examples
 
+  python:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.14"]
+    defaults:
+      run:
+        working-directory: crates/pynespra
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+          cache-dependency-glob: crates/pynespra/uv.lock
+      # Also builds the extension with maturin, in debug mode
+      - run: uv sync --locked --group dev
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync mypy python
+      - run: uv run --no-sync pytest
+
   # Single status to require in branch protection
   ci-ok:
     name: CI OK
     if: always()
-    needs: [fmt, clippy, test, msrv, docs, examples]
+    needs: [fmt, clippy, test, msrv, docs, examples, python]
     runs-on: ubuntu-latest
     steps:
       - name: Check results
