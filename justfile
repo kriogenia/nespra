@@ -10,6 +10,8 @@ set default-list := true
   cargo test --workspace --all-features
   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
   cargo build --workspace --examples
+  just crates pynespra lint
+  just crates pynespra test
 
 # TODO: set-up with uv and Vespa container set-up
 

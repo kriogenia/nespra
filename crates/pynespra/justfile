@@ -24,7 +24,7 @@ run *args: develop
 # Rebuilds the extension and runs the Python tests (pytest, in ./tests)
 [group("test")]
 test *args: develop
-  uv run --with pytest pytest "$@"
+  uv run --with pytest --with pytest-asyncio pytest "$@"
 
 # Formats and lints the Rust code of the extension
 [group("lint")]

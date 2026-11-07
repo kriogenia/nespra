@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any, Callable, Literal
+from collections.abc import Callable, Mapping
+from typing import Any, Literal
 
 import cbor2
 import orjson
@@ -36,7 +36,7 @@ def decode_response(format: str, status: int, body: bytes) -> dict[str, Any]:
     then non-successful statuses.
     """
     try:
-        response = _DECODERS[format](body)
+        response: dict[str, Any] = _DECODERS[format](body)
     except Exception as e:
         if not 200 <= status < 300:
             raise StatusError(status, body) from e
