@@ -32,6 +32,13 @@ test *args: develop
   cargo fmt --check
   cargo clippy --all-targets -- -D warnings
 
+# Lints and type-checks the Python code
+[group("lint")]
+@lint:
+  uv run --with ruff ruff check .
+  uv run --with ruff ruff format --check .
+  uv run --with mypy --with pytest mypy python
+
 # Builds the distributable wheel into ./target/wheels
 [group("build")]
 @wheel:
