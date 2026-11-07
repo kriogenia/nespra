@@ -7,3 +7,8 @@ release_always = false
 
 [[package]]
 name = "nespra"
+
+# The Python package has its own release flow, see .github/workflows/pynespra-release.yml
+[[package]]
+name = "pynespra"
+release = false
