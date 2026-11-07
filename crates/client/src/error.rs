@@ -71,6 +71,26 @@ pub enum CodecError {
     Decode(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
+/// A string that is not a valid value of the type it was parsed into, such as
+/// [`Format`](crate::Format) or [`HttpVersion`](crate::HttpVersion).
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[error("Unknown {kind} {value:?}, expected one of: {expected}")]
+pub struct ParseError {
+    kind: &'static str,
+    value: String,
+    expected: &'static str,
+}
+
+impl ParseError {
+    pub(crate) fn new(kind: &'static str, value: &str, expected: &'static str) -> Self {
+        Self {
+            kind,
+            value: value.to_string(),
+            expected,
+        }
+    }
+}
+
 /// Errors building a [`Vespa`](crate::Vespa) client.
 #[derive(Error, Debug)]
 #[non_exhaustive]
