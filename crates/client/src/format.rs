@@ -1,6 +1,8 @@
+use std::str::FromStr;
+
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::error::CodecError;
+use crate::error::{CodecError, ParseError};
 
 /// Format of the response bodies returned by Vespa.
 ///
@@ -31,6 +33,21 @@ impl Format {
         match self {
             Format::Cbor => ciborium::from_reader(bytes).map_err(|e| CodecError::Decode(e.into())),
             Format::Json => serde_json::from_slice(bytes).map_err(|e| CodecError::Decode(e.into())),
+        }
+    }
+}
+
+impl FromStr for Format {
+    type Err = ParseError;
+
+    /// Parses `cbor` or `json`, ignoring the case.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.eq_ignore_ascii_case("cbor") {
+            Ok(Format::Cbor)
+        } else if s.eq_ignore_ascii_case("json") {
+            Ok(Format::Json)
+        } else {
+            Err(ParseError::new("format", s, "cbor, json"))
         }
     }
 }
@@ -104,6 +121,17 @@ mod test {
     fn test_default_and_mime() {
         assert_eq!(Format::default(), Format::Cbor);
         assert_eq!(Format::Cbor.mime(), "application/cbor");
+    }
+
+    #[test]
+    fn test_from_str() {
+        assert_eq!("cbor".parse(), Ok(Format::Cbor));
+        assert_eq!("JSON".parse(), Ok(Format::Json));
+        let error = "xml".parse::<Format>().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            r#"Unknown format "xml", expected one of: cbor, json"#
+        );
     }
 
     #[test]
