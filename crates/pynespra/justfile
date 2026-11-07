@@ -16,7 +16,7 @@ set positional-arguments
 repl: develop
   uv run python
 
-# Rebuilds the extension and runs a script or one-liner: `just run script.py` or `just run -c "import nespra; print(nespra.sum_as_string(1, 2))"`
+# Rebuilds the extension and runs a script or one-liner: `just run script.py` or `just run -c "import nespra; print(nespra.Vespa)"`
 [group("dev")]
 run *args: develop
   uv run python "$@"
