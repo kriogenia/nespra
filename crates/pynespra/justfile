@@ -1,0 +1,44 @@
+set default-list := true
+set positional-arguments
+
+# Builds the extension in debug mode and installs it into the local .venv
+[group("dev")]
+@develop:
+  uvx maturin develop --uv
+
+# Same as develop but optimized, use it to measure performance
+[group("dev")]
+@release:
+  uvx maturin develop --uv --release
+
+# Rebuilds the extension and opens a Python REPL with it importable
+[group("dev")]
+repl: develop
+  uv run python
+
+# Rebuilds the extension and runs a script or one-liner: `just run script.py` or `just run -c "import nespra; print(nespra.sum_as_string(1, 2))"`
+[group("dev")]
+run *args: develop
+  uv run python "$@"
+
+# Rebuilds the extension and runs the Python tests (pytest, in ./tests)
+[group("test")]
+test *args: develop
+  uv run --with pytest pytest "$@"
+
+# Formats and lints the Rust code of the extension
+[group("lint")]
+@check:
+  cargo fmt --check
+  cargo clippy --all-targets -- -D warnings
+
+# Builds the distributable wheel into ./target/wheels
+[group("build")]
+@wheel:
+  uvx maturin build --release
+
+# Removes the build artifacts and the virtual environment
+[group("build")]
+@clean:
+  cargo clean
+  rm -rf .venv

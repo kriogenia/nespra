@@ -1,3 +1,5 @@
+mod pynespra
+
 # Runs all the integration tests (they require the Docker to be running locally)
 [group("test")]
 @integration:
