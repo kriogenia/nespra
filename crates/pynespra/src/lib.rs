@@ -47,5 +47,80 @@ fn request_error(error: SearchError) -> PyErr {
     });
     err
 }
+
+/// Sends raw search requests to Vespa.
+#[pyclass(module = "nespra._core", frozen)]
+struct Transport {
+    vespa: Vespa,
+}
+
+#[pymethods]
+impl Transport {
+    #[new]
+    #[pyo3(signature = (
+        url,
+        *,
+        bearer_token = None,
+        client_cert = None,
+        client_key = None,
+        headers = None,
+        user_agent = None,
+        timeout = None,
+        connect_timeout = None,
+        http_version = "HTTP/2",
+        format = "cbor",
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        url: String,
+        bearer_token: Option<String>,
+        client_cert: Option<Vec<u8>>,
+        client_key: Option<Vec<u8>>,
+        headers: Option<Vec<(String, String)>>,
+        user_agent: Option<String>,
+        timeout: Option<f64>,
+        connect_timeout: Option<f64>,
+        http_version: &str,
+        format: &str,
+    ) -> PyResult<Self> {
+        let mut builder = Vespa::builder(url)
+            .format(format.parse::<Format>().map_err(build_error)?)
+            .http_version(http_version.parse::<HttpVersion>().map_err(build_error)?);
+
+        if let Some(token) = bearer_token {
+            builder = builder.bearer_token(&token);
+        }
+
+        match (client_cert, client_key) {
+            (Some(cert), Some(key)) => builder = builder.client_pem(&cert, &key),
+            (None, None) => {}
+            _ => return Err(build_error("client_cert and client_key go together")),
+        }
+
+        for (name, value) in headers.unwrap_or_default() {
+            let name = HeaderName::try_from(name.as_str()).map_err(build_error)?;
+            let value = HeaderValue::from_str(&value).map_err(build_error)?;
+            builder = builder.header(name, value);
+        }
+
+        if let Some(user_agent) = user_agent {
+            builder = builder.user_agent(HeaderValue::from_str(&user_agent).map_err(build_error)?);
+        }
+
+        if let Some(timeout) = timeout {
+            builder = builder.timeout(seconds("timeout", timeout)?);
+        }
+
+        if let Some(timeout) = connect_timeout {
+            builder = builder.connect_timeout(seconds("connect_timeout", timeout)?);
+        }
+
+        let vespa = builder.build().map_err(build_error)?;
+        Ok(Self { vespa })
     }
+
+}
+
+}
+
 }
