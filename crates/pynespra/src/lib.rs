@@ -170,4 +170,11 @@ fn options(timeout: Option<f64>) -> PyResult<SearchOptions> {
     Ok(options)
 }
 
+#[pymodule]
+fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<Transport>()?;
+    m.add("NespraError", m.py().get_type::<NespraError>())?;
+    m.add("BuildError", m.py().get_type::<BuildError>())?;
+    m.add("RequestError", m.py().get_type::<RequestError>())?;
+    Ok(())
 }
