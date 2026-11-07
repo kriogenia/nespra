@@ -8,12 +8,12 @@
 //! - `gzip` (default): asks Vespa for gzip compressed responses and decompresses them.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use http::{HeaderMap, HeaderName, HeaderValue, header::AUTHORIZATION};
 use reqwest::{Client, ClientBuilder, Identity, Url};
 
-use crate::error::BuildError;
+use crate::error::{BuildError, ParseError};
 
 pub mod error;
 mod format;
@@ -264,4 +264,30 @@ pub enum HttpVersion {
     Http2,
     /// HTTP/1.1 only.
     Http1,
+}
+
+impl FromStr for HttpVersion {
+    type Err = ParseError;
+
+    /// Parses `1.1` or `2`.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "HTTP/1.1" => Ok(HttpVersion::Http1),
+            "HTTP/2" => Ok(HttpVersion::Http2),
+            _ => Err(ParseError::new("HTTP version", s, "HTTP/1.1, HTTP/2")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_http_version_from_str() {
+        assert_eq!("HTTP/1.1".parse(), Ok(HttpVersion::Http1));
+        assert_eq!("HTTP/2".parse(), Ok(HttpVersion::Http2));
+        assert!("HTTP/3".parse::<HttpVersion>().is_err());
+        assert!("".parse::<HttpVersion>().is_err());
+    }
 }
