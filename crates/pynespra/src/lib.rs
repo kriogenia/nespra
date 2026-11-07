@@ -5,7 +5,7 @@
 //! decoding, error classification and retries are done in the Python package, which
 //! keeps this layer as fast and thin as possible.
 
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use nespra::{
     Format, HttpVersion, Vespa,
@@ -81,7 +81,7 @@ impl Transport {
         bearer_token: Option<String>,
         client_cert: Option<Vec<u8>>,
         client_key: Option<Vec<u8>>,
-        headers: Option<Vec<(String, String)>>,
+        headers: Option<HashMap<String, String>>,
         user_agent: Option<String>,
         timeout: Option<f64>,
         connect_timeout: Option<f64>,
