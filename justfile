@@ -13,6 +13,11 @@ set default-list := true
   just crates pynespra lint
   just crates pynespra test
 
+# Installs the git hooks (prek, https://prek.j178.dev) defined in .pre-commit-config.yaml
+[group("dev")]
+@hooks:
+  prek install
+
 # TODO: set-up with uv and Vespa container set-up
 
 # Starts the development Vespa Docker service
