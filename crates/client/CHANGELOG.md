@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/kriogenia/nespra/compare/v0.1.2...v0.1.3) - 2026-11-08
+
+### Added
+
+- pynespra ([#20](https://github.com/kriogenia/nespra/pull/20))
+
+### Other
+
+- benchmark and prek ([#23](https://github.com/kriogenia/nespra/pull/23))
+
 ## [0.1.2](https://github.com/kriogenia/nespra/compare/v0.1.1...v0.1.2) - 2026-11-07
 
 ### Added
