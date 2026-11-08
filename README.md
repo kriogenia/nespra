@@ -24,6 +24,10 @@ let response: Response<Value> = vespa
     .await?;
 ```
 
+## Python
+
+The [`pynespra`](crates/pynespra) crate packages the client as a Python library, published to PyPI as `pynespra` and imported as `nespra`. See its [README](crates/pynespra/README.md).
+
 ## Releasing
 
 Releases are automated with [release-plz](https://release-plz.dev):
@@ -33,6 +37,16 @@ Releases are automated with [release-plz](https://release-plz.dev):
 3. Review and merge that PR. release-plz then tags the commit, creates the GitHub release and publishes the crate to crates.io.
 
 The commit types drive the version bump: `feat` is a minor bump, `fix` and other changes are a patch bump, and a `!` after the type or a `BREAKING CHANGE:` footer is a major bump (minor while below 1.0).
+
+### Python package
+
+The Python package is released separately, release-plz ignores it:
+
+1. Bump the `version` in `crates/pynespra/Cargo.toml` (and make sure it depends on a published `nespra` version) and merge it into `main`.
+2. Tag the merge commit and push the tag: `git tag pynespra-v0.1.0 && git push origin pynespra-v0.1.0`.
+3. The [Release pynespra](.github/workflows/pynespra-release.yml) workflow builds the wheels (Linux, macOS and Windows) and the source distribution, smoke-tests the wheels, publishes them to PyPI with trusted publishing and creates the GitHub release.
+
+Before the first release, create the `pypi` and `testpypi` environments in the repository settings and add a pending trusted publisher on PyPI and TestPyPI (owner `kriogenia`, repository `nespra`, workflow `pynespra-release.yml`, environment `pypi`/`testpypi`). Running the workflow manually builds everything and publishes to TestPyPI.
 
 Run `just ci` to execute the same quality checks as CI locally.
 
