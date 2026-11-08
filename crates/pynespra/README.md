@@ -16,10 +16,12 @@ Requires Python 3.10 or later. The package is imported as `nespra`.
 from nespra import Vespa
 
 vespa = Vespa("http://localhost:8080")
-response = vespa.search({
-    "yql": "select title, body from doc where userQuery()",
-    "query": "Is statin use connected to breast cancer?",
-})
+response = vespa.search(
+    {
+        "yql": "select title, body from doc where userQuery()",
+        "query": "Is statin use connected to breast cancer?",
+    }
+)
 print(response["root"]["children"])
 ```
 
