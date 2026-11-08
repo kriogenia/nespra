@@ -12,6 +12,18 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
 
+  - package-ecosystem: uv
+    directory: /crates/pynespra
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+    groups:
+      python:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
