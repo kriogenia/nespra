@@ -26,6 +26,16 @@ run *args: develop
 test *args: develop
   uv run --with pytest --with pytest-asyncio pytest "$@"
 
+# Runs the integration tests, they require Vespa running locally (`just start` in the root)
+[group("test")]
+integration *args: develop
+  uv run --with pytest --with pytest-asyncio pytest -m integration "$@"
+
+# Benchmarks the clients against the local Vespa, see benches/bench.py for the options
+[group("test")]
+bench *args: release
+  uv run --with httpx --with pyvespa python benches/bench.py "$@"
+
 # Formats and lints the Rust code of the extension
 [group("lint")]
 @check:

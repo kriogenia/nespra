@@ -28,7 +28,11 @@ module-name = "nespra._core"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+# The integration tests need a running Vespa: `just integration`
+addopts = "-m 'not integration'"
+markers = ["integration: needs a running Vespa, see tests/test_integration.py"]
 
 [tool.ruff]
 line-length = 100
