@@ -50,6 +50,10 @@ Before the first release, create the `pypi` and `testpypi` environments in the r
 
 Run `just ci` to execute the same quality checks as CI locally.
 
+## Git hooks
+
+The repository uses [prek](https://prek.j178.dev) (compatible with pre-commit) for its git hooks. Install it with `uv tool install prek` or `cargo install prek`, then run `just hooks` once. On commit they fix whitespace and run `cargo fmt` and `ruff`, and check the commit message follows the Conventional Commits format. On push they run `cargo clippy`, `cargo test` and `mypy`. Run them on everything with `prek run --all-files`.
+
 ## License
 
 Licensed under either of [Apache License, Version 2.0](https://github.com/kriogenia/nespra/blob/main/LICENSE-APACHE) or [MIT license](https://github.com/kriogenia/nespra/blob/main/LICENSE-MIT) at your option.
