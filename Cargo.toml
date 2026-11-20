@@ -2,6 +2,12 @@
 resolver = "3"
 members = ["crates/*"]
 
+[workspace.package]
+edition = "2024"
+rust-version = "1.88"
+repository = "https://github.com/kriogenia/nespra"
+license = "MIT OR Apache-2.0"
+
 [workspace.dependencies]
 http = "1.5.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "http2", "charset", "system-proxy"] }
