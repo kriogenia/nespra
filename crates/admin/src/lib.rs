@@ -3,11 +3,14 @@
 //! This is an independent community project, not affiliated with or endorsed by Vespa.ai.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+use http::{StatusCode, header::ACCEPT};
 use reqwest::{Client, Url};
+use serde::de::DeserializeOwned;
 
 pub mod error;
+pub mod state;
 
-use crate::error::BuildError;
+use crate::error::{AdminError, BuildError};
 
 /// The HTTP client library used by nespra_admin. Re-exported so the types accepted by the
 /// builders are always the ones of the version it uses.
@@ -16,7 +19,6 @@ pub use reqwest;
 /// Client of the operational APIs of a Vespa node, such as a container.
 #[derive(Debug, Clone)]
 pub struct Admin {
-    #[expect(dead_code, reason = "used by the endpoints")]
     client: Client,
     url: Url,
 }
@@ -39,6 +41,40 @@ impl Admin {
     /// Base URL of the node.
     pub fn url(&self) -> &Url {
         &self.url
+    }
+
+    /// Sends a `GET` to the path and decodes the JSON body.
+    ///
+    /// The body is decoded whatever the status, as some APIs (like the health one) answer
+    /// with a valid body on errors. When it cannot be decoded, a non-successful status is
+    /// reported as [`AdminError::Status`].
+    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, AdminError> {
+        let url = self.url.join(path).map_err(|e| AdminError::Url {
+            path: path.to_string(),
+            reason: e.to_string(),
+        })?;
+        let response = self
+            .client
+            .get(url)
+            .header(ACCEPT, "application/json")
+            .send()
+            .await
+            .map_err(AdminError::Request)?;
+        let status = response.status();
+        let body = response.bytes().await.map_err(AdminError::Response)?;
+        decode(status, &body)
+    }
+}
+
+/// Decodes a JSON body, reporting the status when a failed response has no valid body.
+fn decode<T: DeserializeOwned>(status: StatusCode, body: &[u8]) -> Result<T, AdminError> {
+    match serde_json::from_slice(body) {
+        Ok(value) => Ok(value),
+        Err(_) if !status.is_success() => Err(AdminError::Status {
+            status,
+            body: body.to_vec(),
+        }),
+        Err(e) => Err(AdminError::Decode(e)),
     }
 }
 
@@ -110,5 +146,23 @@ mod test {
                 "{url} must be rejected"
             );
         }
+    }
+
+    #[test]
+    fn test_decode_reports_the_status_of_an_undecodable_failure() {
+        let error = decode::<serde_json::Value>(StatusCode::BAD_GATEWAY, b"<html>").unwrap_err();
+        assert!(matches!(error, AdminError::Status { status, .. } if status == 502));
+    }
+
+    #[test]
+    fn test_decode_prefers_a_valid_body_over_the_status() {
+        let value: serde_json::Value = decode(StatusCode::SERVICE_UNAVAILABLE, b"{}").unwrap();
+        assert!(value.is_object());
+    }
+
+    #[test]
+    fn test_decode_error_on_success() {
+        let error = decode::<serde_json::Value>(StatusCode::OK, b"nope").unwrap_err();
+        assert!(matches!(error, AdminError::Decode(_)));
     }
 }
