@@ -5,6 +5,19 @@
 //! It complements [`nespra`](https://docs.rs/nespra), which covers the data APIs. Both
 //! accept a [`reqwest::Client`], so one client can be shared between them with
 //! [`Admin::with_client`].
+//!
+//! # Example
+//!
+//! ```no_run
+//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! use nespra_admin::Admin;
+//!
+//! let admin = Admin::new("http://localhost:8080")?;
+//! let health = admin.health().await?;
+//! println!("The node is {}", health.status.code);
+//! # Ok(())
+//! # }
+//! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::time::Duration;
