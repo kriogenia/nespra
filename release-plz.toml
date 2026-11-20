@@ -12,3 +12,6 @@ name = "nespra"
 [[package]]
 name = "pynespra"
 release = false
+
+[[package]]
+name = "nespra_admin"

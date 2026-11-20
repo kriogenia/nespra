@@ -1,11 +1,11 @@
 [package]
 name = "nespra"
 version = "0.1.2"
-edition = "2024"
-rust-version = "1.88"
+edition.workspace = true
+rust-version.workspace = true
 description = "Unofficial async Rust client for the Vespa search engine"
-repository = "https://github.com/kriogenia/nespra"
-license = "MIT OR Apache-2.0"
+repository.workspace = true
+license.workspace = true
 readme = "../../README.md"
 keywords = ["vespa", "search", "client", "cbor", "async"]
 categories = ["api-bindings", "asynchronous"]
@@ -14,6 +14,7 @@ categories = ["api-bindings", "asynchronous"]
 default = ["request-models", "gzip"]
 request-models = []
 gzip = ["reqwest/gzip"]
+admin = ["dep:nespra_admin"]
 
 [[example]]
 name = "models"
@@ -23,15 +24,16 @@ required-features = ["request-models"]
 bytes = "1"
 ciborium = "0.2.2"
 fastrand = "2"
-http = "1.5.0"
-reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "http2", "charset", "system-proxy"] }
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.151"
-tokio = { version = "1.53.1", features = ["time"] }
-thiserror = "2.0.20"
+http.workspace = true
+nespra_admin = { path = "../admin", version = "0.1.0", optional = true }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["time"] }
+thiserror.workspace = true
 
 [dev-dependencies]
-tokio = { version = "1.53.1", features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 
 [package.metadata.docs.rs]
 all-features = true

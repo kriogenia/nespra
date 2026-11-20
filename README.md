@@ -24,6 +24,10 @@ let response: Response<Value> = vespa
     .await?;
 ```
 
+## Operational APIs
+
+The [`nespra_admin`](crates/admin) crate covers the operational APIs of Vespa, like the health of the nodes. Use it on its own or enable the `admin` feature to get it as `nespra::admin`. Both clients accept the same `reqwest::Client`, so they can share connections and TLS configuration.
+
 ## Python
 
 The [`pynespra`](crates/pynespra) crate packages the client as a Python library, published to PyPI as `pynespra` and imported as `nespra`. See its [README](crates/pynespra/README.md).
@@ -38,7 +42,11 @@ Releases are automated with [release-plz](https://release-plz.dev):
 
 The commit types drive the version bump: `feat` is a minor bump, `fix` and other changes are a patch bump, and a `!` after the type or a `BREAKING CHANGE:` footer is a major bump (minor while below 1.0).
 
-### Python package
+### Operational APIs
+
+The [`nespra_admin`](crates/admin) crate covers the operational APIs of Vespa, like the health of the nodes. Use it on its own or enable the `admin` feature to get it as `nespra::admin`. Both clients accept the same `reqwest::Client`, so they can share connections and TLS configuration.
+
+## Python package
 
 The Python package is released separately, release-plz ignores it:
 

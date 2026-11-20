@@ -1,11 +1,11 @@
 [package]
 name = "pynespra"
 version = "0.1.0"
-edition = "2024"
-rust-version = "1.88"
+edition.workspace = true
+rust-version.workspace = true
 description = "Python bindings of nespra, an unofficial client for the Vespa search engine"
-repository = "https://github.com/kriogenia/nespra"
-license = "MIT OR Apache-2.0"
+repository.workspace = true
+license.workspace = true
 publish = false
 
 [lib]
