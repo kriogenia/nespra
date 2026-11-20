@@ -51,6 +51,14 @@ pub enum BuildError {
         reason: String,
     },
 
+    /// A header, or a token used to build one, is not a valid header value.
+    #[error("Invalid header value: {0}")]
+    InvalidHeader(#[from] http::header::InvalidHeaderValue),
+
+    /// The certificate or the key of the client identity are not valid PEM.
+    #[error("Invalid client identity: {0}")]
+    Identity(#[source] reqwest::Error),
+
     /// The underlying HTTP client could not be built.
     #[error("Failed to build the HTTP client: {0}")]
     Client(#[source] reqwest::Error),

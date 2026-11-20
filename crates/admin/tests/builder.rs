@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use nespra_admin::{
     Admin,
-    error::AdminError,
+    error::{AdminError, BuildError},
     reqwest::header::{HeaderName, HeaderValue},
 };
 use wiremock::{
@@ -72,4 +72,50 @@ async fn test_timeout() {
         Err(AdminError::Request(e)) => assert!(e.is_timeout()),
         other => panic!("expected a timeout, got {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn test_bearer_token_is_sent() {
+    let server = server(
+        health()
+            .and(header("authorization", "Bearer secret"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(UP)),
+    )
+    .await;
+    let admin = Admin::builder(server.uri())
+        .bearer_token("secret")
+        .build()
+        .unwrap();
+    assert!(admin.health().await.is_ok());
+}
+
+#[test]
+fn test_bearer_token_is_hidden_from_debug_output() {
+    let builder = Admin::builder("http://localhost").bearer_token("secret");
+    assert!(!format!("{builder:?}").contains("secret"));
+}
+
+#[test]
+fn test_invalid_token_is_reported_when_building() {
+    let result = Admin::builder("http://localhost")
+        .bearer_token("line\nbreak")
+        .build();
+    assert!(matches!(result, Err(BuildError::InvalidHeader(_))));
+}
+
+#[test]
+fn test_invalid_identity_is_reported_when_building() {
+    let result = Admin::builder("http://localhost")
+        .client_pem(b"not a cert", b"not a key")
+        .build();
+    assert!(matches!(result, Err(BuildError::Identity(_))));
+}
+
+#[test]
+fn test_the_first_error_is_the_one_reported() {
+    let result = Admin::builder("not a url")
+        .client_pem(b"not a cert", b"not a key")
+        .bearer_token("line\nbreak")
+        .build();
+    assert!(matches!(result, Err(BuildError::Identity(_))));
 }

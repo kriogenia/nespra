@@ -5,8 +5,11 @@
 
 use std::time::Duration;
 
-use http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header::ACCEPT};
-use reqwest::{Client, Url};
+use http::{
+    HeaderMap, HeaderName, HeaderValue, StatusCode,
+    header::{ACCEPT, AUTHORIZATION},
+};
+use reqwest::{Client, ClientBuilder, Identity, Url};
 use serde::de::DeserializeOwned;
 
 pub mod application;
@@ -106,10 +109,12 @@ fn base_url(url: String) -> Result<Url, BuildError> {
     Ok(parsed)
 }
 
-/// Builder of [`Admin`] clients.
+/// Builder of [`Admin`] clients. The errors of its methods are reported by [`build`](Self::build).
 #[derive(Debug)]
 pub struct AdminBuilder {
     url: String,
+    error: Option<BuildError>,
+    client: ClientBuilder,
     headers: HeaderMap,
     user_agent: HeaderValue,
     connect_timeout: Duration,
@@ -122,6 +127,8 @@ impl AdminBuilder {
     pub fn new(url: impl Into<String>) -> Self {
         Self {
             url: url.into(),
+            error: None,
+            client: Client::builder(),
             headers: HeaderMap::new(),
             user_agent: HeaderValue::from_static(concat!(
                 "nespra_admin/",
@@ -130,6 +137,46 @@ impl AdminBuilder {
             connect_timeout: DEFAULT_CONNECT_TIMEOUT,
             timeout: DEFAULT_TIMEOUT,
         }
+    }
+
+    /// Keeps the first error to report it when building.
+    fn record(&mut self, error: impl Into<BuildError>) {
+        self.error.get_or_insert(error.into());
+    }
+
+    /// Sets the identity using a custom [`reqwest::Identity`].
+    pub fn identity(mut self, identity: Identity) -> Self {
+        self.client = self.client.identity(identity);
+        self
+    }
+
+    /// Sets the mTLS identity from PEM encoded certificate and private key, such as the
+    /// data plane certificate of a Vespa Cloud application.
+    pub fn client_pem(mut self, cert: &[u8], key: &[u8]) -> Self {
+        let mut pem = Vec::with_capacity(cert.len() + key.len() + 1);
+        pem.extend_from_slice(cert);
+        if !cert.ends_with(b"\n") {
+            pem.push(b'\n');
+        }
+        pem.extend_from_slice(key);
+        match Identity::from_pem(&pem) {
+            Ok(identity) => self.client = self.client.identity(identity),
+            Err(e) => self.record(BuildError::Identity(e)),
+        }
+        self
+    }
+
+    /// Authenticates every request with a bearer token, such as a Vespa Cloud data plane
+    /// token. The header is marked as sensitive so it is left out of debug output.
+    pub fn bearer_token(mut self, token: &str) -> Self {
+        match HeaderValue::from_str(&format!("Bearer {token}")) {
+            Ok(mut value) => {
+                value.set_sensitive(true);
+                self.headers.insert(AUTHORIZATION, value);
+            }
+            Err(e) => self.record(e),
+        }
+        self
     }
 
     /// Adds a header sent with every request, replacing any previous value for that name.
@@ -161,10 +208,15 @@ impl AdminBuilder {
     ///
     /// # Errors
     ///
-    /// Fails if the URL is not valid or the HTTP client cannot be built.
+    /// Fails with the first error found in the configuration, such as an invalid URL,
+    /// token or identity.
     pub fn build(self) -> Result<Admin, BuildError> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
         let url = base_url(self.url)?;
-        let client = Client::builder()
+        let client = self
+            .client
             .user_agent(self.user_agent)
             .default_headers(self.headers)
             .connect_timeout(self.connect_timeout)
