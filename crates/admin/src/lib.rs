@@ -7,6 +7,7 @@ use http::{StatusCode, header::ACCEPT};
 use reqwest::{Client, Url};
 use serde::de::DeserializeOwned;
 
+pub mod application;
 pub mod error;
 pub mod state;
 
