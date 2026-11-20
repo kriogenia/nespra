@@ -3,7 +3,9 @@
 //! This is an independent community project, not affiliated with or endorsed by Vespa.ai.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use http::{StatusCode, header::ACCEPT};
+use std::time::Duration;
+
+use http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header::ACCEPT};
 use reqwest::{Client, Url};
 use serde::de::DeserializeOwned;
 
@@ -16,6 +18,11 @@ use crate::error::{AdminError, BuildError};
 /// The HTTP client library used by nespra_admin. Re-exported so the types accepted by the
 /// builders are always the ones of the version it uses.
 pub use reqwest;
+
+/// Default time to establish a connection.
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+/// Default time for a whole request, from connecting to reading the full response.
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Client of the operational APIs of a Vespa node, such as a container.
 #[derive(Debug, Clone)]
@@ -103,13 +110,51 @@ fn base_url(url: String) -> Result<Url, BuildError> {
 #[derive(Debug)]
 pub struct AdminBuilder {
     url: String,
+    headers: HeaderMap,
+    user_agent: HeaderValue,
+    connect_timeout: Duration,
+    timeout: Duration,
 }
 
 impl AdminBuilder {
     /// Creates a new builder for a client pointing to the specified URL, same as
     /// [`Admin::builder`].
     pub fn new(url: impl Into<String>) -> Self {
-        Self { url: url.into() }
+        Self {
+            url: url.into(),
+            headers: HeaderMap::new(),
+            user_agent: HeaderValue::from_static(concat!(
+                "nespra_admin/",
+                env!("CARGO_PKG_VERSION")
+            )),
+            connect_timeout: DEFAULT_CONNECT_TIMEOUT,
+            timeout: DEFAULT_TIMEOUT,
+        }
+    }
+
+    /// Adds a header sent with every request, replacing any previous value for that name.
+    pub fn header(mut self, name: HeaderName, value: HeaderValue) -> Self {
+        self.headers.insert(name, value);
+        self
+    }
+
+    /// Sets the `User-Agent` of the requests, `nespra_admin/<version>` by default.
+    pub fn user_agent(mut self, user_agent: HeaderValue) -> Self {
+        self.user_agent = user_agent;
+        self
+    }
+
+    /// Sets the time allowed to establish a connection, 10 seconds by default.
+    pub fn connect_timeout(mut self, timeout: Duration) -> Self {
+        self.connect_timeout = timeout;
+        self
+    }
+
+    /// Sets the time allowed for a whole request, from connecting to reading the full
+    /// response, 10 seconds by default.
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
     }
 
     /// Builds the client.
@@ -119,7 +164,13 @@ impl AdminBuilder {
     /// Fails if the URL is not valid or the HTTP client cannot be built.
     pub fn build(self) -> Result<Admin, BuildError> {
         let url = base_url(self.url)?;
-        let client = Client::builder().build().map_err(BuildError::Client)?;
+        let client = Client::builder()
+            .user_agent(self.user_agent)
+            .default_headers(self.headers)
+            .connect_timeout(self.connect_timeout)
+            .timeout(self.timeout)
+            .build()
+            .map_err(BuildError::Client)?;
         Ok(Admin { client, url })
     }
 }
