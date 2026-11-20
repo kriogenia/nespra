@@ -895,6 +895,7 @@ dependencies = [
  "ciborium",
  "fastrand",
  "http",
+ "nespra_admin",
  "reqwest",
  "serde",
  "serde_json",

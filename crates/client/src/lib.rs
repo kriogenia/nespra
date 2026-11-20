@@ -6,6 +6,8 @@
 //!
 //! - `request-models` (default): helper models to build search requests.
 //! - `gzip` (default): asks Vespa for gzip compressed responses and decompresses them.
+//! - `admin`: re-exports [`nespra_admin`](https://docs.rs/nespra_admin) as [`admin`], the
+//!   client of the operational APIs (health, application status...).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::{str::FromStr, time::Duration};
@@ -26,6 +28,11 @@ pub use retry::RetryPolicy;
 /// The HTTP client library used by nespra. Re-exported so the `Client`, `Identity` and
 /// other types accepted by the builders are always the ones of the version nespra uses.
 pub use reqwest;
+
+/// Client of the operational APIs of Vespa, see [`nespra_admin`](https://docs.rs/nespra_admin).
+#[cfg(feature = "admin")]
+#[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
+pub use nespra_admin as admin;
 
 /// Default time to establish a connection.
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
