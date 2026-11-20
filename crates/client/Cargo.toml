@@ -1,11 +1,11 @@
 [package]
 name = "nespra"
 version = "0.1.2"
-edition = "2024"
-rust-version = "1.88"
+edition.workspace = true
+rust-version.workspace = true
 description = "Unofficial async Rust client for the Vespa search engine"
-repository = "https://github.com/kriogenia/nespra"
-license = "MIT OR Apache-2.0"
+repository.workspace = true
+license.workspace = true
 readme = "../../README.md"
 keywords = ["vespa", "search", "client", "cbor", "async"]
 categories = ["api-bindings", "asynchronous"]
