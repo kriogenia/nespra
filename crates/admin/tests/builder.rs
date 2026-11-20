@@ -119,3 +119,25 @@ fn test_the_first_error_is_the_one_reported() {
         .build();
     assert!(matches!(result, Err(BuildError::Identity(_))));
 }
+
+#[tokio::test]
+async fn test_custom_client_uses_its_own_configuration() {
+    let server = server(
+        health()
+            .and(header("user-agent", "shared"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(UP)),
+    )
+    .await;
+    let client = nespra_admin::reqwest::Client::builder()
+        .user_agent("shared")
+        .build()
+        .unwrap();
+    let admin = Admin::with_client(server.uri(), client).unwrap();
+    assert!(admin.health().await.is_ok());
+}
+
+#[test]
+fn test_custom_client_validates_the_url() {
+    let result = Admin::with_client("ftp://host", nespra_admin::reqwest::Client::new());
+    assert!(matches!(result, Err(BuildError::InvalidUrl { .. })));
+}

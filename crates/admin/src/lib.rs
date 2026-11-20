@@ -1,6 +1,10 @@
 //! Unofficial async client for the operational APIs of [Vespa](https://vespa.ai).
 //!
 //! This is an independent community project, not affiliated with or endorsed by Vespa.ai.
+//!
+//! It complements [`nespra`](https://docs.rs/nespra), which covers the data APIs. Both
+//! accept a [`reqwest::Client`], so one client can be shared between them with
+//! [`Admin::with_client`].
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::time::Duration;
@@ -42,6 +46,22 @@ impl Admin {
     /// Fails if the URL is not a valid `http` or `https` URL.
     pub fn new(url: impl Into<String>) -> Result<Self, BuildError> {
         Admin::builder(url).build()
+    }
+
+    /// Creates a client that sends the requests with the provided HTTP client, which
+    /// keeps its own configuration (timeouts, identity, headers, HTTP version...).
+    ///
+    /// This allows to share one client, and so its connections and TLS configuration,
+    /// with other clients like the ones of [`nespra`](https://docs.rs/nespra).
+    ///
+    /// # Errors
+    ///
+    /// Fails if the URL is not a valid `http` or `https` URL.
+    pub fn with_client(url: impl Into<String>, client: Client) -> Result<Self, BuildError> {
+        Ok(Admin {
+            client,
+            url: base_url(url.into())?,
+        })
     }
 
     /// Provides a builder to create a tailored client.
