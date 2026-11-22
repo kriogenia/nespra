@@ -1,3 +1,4 @@
+use super::palette::Palette;
 use crate::core::connection::ActiveTarget;
 
 /// State of the whole application.
@@ -6,13 +7,16 @@ pub struct Model {
     running: RunningState,
     target: Option<ActiveTarget>,
     overlay: Option<Overlay>,
+    notice: Option<String>,
 }
 
 /// Window shown on top of the rest.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Overlay {
     /// Key bindings.
     Help,
+    /// Command palette.
+    Palette(Palette),
 }
 
 /// Whether the application keeps running.
@@ -43,18 +47,49 @@ impl Model {
     }
 
     /// Overlay currently open.
-    pub fn overlay(&self) -> Option<Overlay> {
-        self.overlay
+    pub fn overlay(&self) -> Option<&Overlay> {
+        self.overlay.as_ref()
     }
 
-    /// Opens the overlay, or closes it if it is already open.
-    pub(super) fn toggle_overlay(&mut self, overlay: Overlay) {
-        self.overlay = (self.overlay != Some(overlay)).then_some(overlay);
+    /// Message for the user about the last action, like an error.
+    pub fn notice(&self) -> Option<&str> {
+        self.notice.as_deref()
+    }
+
+    /// Opens the help, or closes it if it is already open.
+    pub(super) fn toggle_help(&mut self) {
+        self.overlay = match self.overlay {
+            Some(Overlay::Help) => None,
+            _ => Some(Overlay::Help),
+        };
+    }
+
+    /// Opens an empty command palette.
+    pub(super) fn open_palette(&mut self) {
+        self.overlay = Some(Overlay::Palette(Palette::default()));
+    }
+
+    /// Command palette, if it is open.
+    pub(super) fn palette_mut(&mut self) -> Option<&mut Palette> {
+        match &mut self.overlay {
+            Some(Overlay::Palette(palette)) => Some(palette),
+            _ => None,
+        }
     }
 
     /// Closes the open overlay.
     pub(super) fn close_overlay(&mut self) {
         self.overlay = None;
+    }
+
+    /// Shows a message to the user, replacing the previous one.
+    pub(super) fn set_notice(&mut self, notice: impl Into<String>) {
+        self.notice = Some(notice.into());
+    }
+
+    /// Hides the message shown to the user.
+    pub(super) fn clear_notice(&mut self) {
+        self.notice = None;
     }
 
     /// Stops the application.

@@ -5,6 +5,7 @@ mod help;
 mod keymap;
 mod message;
 mod model;
+mod palette;
 mod update;
 mod view;
 

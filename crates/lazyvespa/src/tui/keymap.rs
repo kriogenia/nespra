@@ -78,6 +78,11 @@ pub struct Binding {
 /// Bindings available everywhere.
 pub const GLOBAL: &[Binding] = &[
     Binding {
+        keys: &[Key::char(':')],
+        message: Message::OpenPalette,
+        description: "command",
+    },
+    Binding {
         keys: &[Key::char('?')],
         message: Message::ToggleHelp,
         description: "help",

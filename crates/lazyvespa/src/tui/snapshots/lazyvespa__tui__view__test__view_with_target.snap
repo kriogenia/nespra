@@ -9,4 +9,4 @@ expression: render(&model).backend()
 "│                                                │"
 "│                                                │"
 "└────────────────────────────────────────────────┘"
-" ? help · q quit                                  "
+" : command · ? help · q quit                      "

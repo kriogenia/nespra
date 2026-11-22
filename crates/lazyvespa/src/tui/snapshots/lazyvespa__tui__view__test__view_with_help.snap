@@ -3,10 +3,10 @@ source: crates/lazyvespa/src/tui/view.rs
 expression: render(&model).backend()
 ---
 "┌───────────────────────────────────── no target ┐"
-"│                    lazyvespa                   │"
 "│      ┌ Keys ────────────────────────────┐      │"
 "│      │       Esc  close                 │      │"
+"│      │         :  command               │      │"
 "│      │         ?  help                  │      │"
 "│      │ q, Ctrl+C  quit                  │      │"
 "└──────└──────────────────────────────────┘──────┘"
-" ? help · q quit                                  "
+" : command · ? help · q quit                      "
