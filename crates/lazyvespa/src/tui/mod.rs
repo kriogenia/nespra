@@ -8,6 +8,7 @@ mod message;
 mod model;
 mod palette;
 mod popup;
+mod query_editor;
 mod status_bar;
 mod target_picker;
 mod update;

@@ -5,7 +5,7 @@ use std::fmt;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{Message, target_picker::PickerMsg};
+use super::{Message, query_editor::EditorMsg, target_picker::PickerMsg};
 
 /// A key, optionally pressed together with modifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +107,27 @@ pub const OVERLAY: &[Binding] = &[Binding {
     message: Message::CloseOverlay,
     description: "close",
 }];
+
+/// Bindings of the query editor out of the edit mode.
+pub const EDITOR: &[Binding] = &[Binding {
+    keys: &[Key::char('i'), Key::new(KeyCode::Enter)],
+    message: Message::Editor(EditorMsg::StartEditing),
+    description: "edit query",
+}];
+
+/// Bindings while typing in the query editor. Any other key is text.
+pub const EDITING: &[Binding] = &[
+    Binding {
+        keys: &[Key::new(KeyCode::Esc)],
+        message: Message::Editor(EditorMsg::StopEditing),
+        description: "stop editing",
+    },
+    Binding {
+        keys: &[Key::ctrl('c')],
+        message: Message::Quit,
+        description: "quit",
+    },
+];
 
 /// Bindings of the target picker.
 pub const TARGET_PICKER: &[Binding] = &[

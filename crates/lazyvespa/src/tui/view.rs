@@ -3,11 +3,11 @@ use ratatui::{
     layout::{Constraint, Layout},
     style::Stylize,
     text::Line,
-    widgets::Block,
 };
 
 use super::{
-    Model, help, keymap,
+    Model, help,
+    keymap::Binding,
     model::{Notice, Overlay},
     status_bar,
     update::active_bindings,
@@ -23,7 +23,9 @@ pub fn view(model: &Model, frame: &mut Frame) {
     .areas(frame.area());
 
     status_bar::render(model.target(), frame, header);
-    frame.render_widget(Block::bordered(), main);
+    let [editor, _results] =
+        Layout::vertical([Constraint::Length(8), Constraint::Fill(1)]).areas(main);
+    model.editor().render(frame, editor);
     match (model.overlay(), model.notice()) {
         (Some(Overlay::Palette(palette)), _) => {
             let line = format!(":{}", palette.input());
@@ -39,7 +41,7 @@ pub fn view(model: &Model, frame: &mut Frame) {
         (_, Some(Notice::Error(text))) => {
             frame.render_widget(Line::from(format!(" {text}")).red(), footer)
         }
-        _ => frame.render_widget(hints(), footer),
+        _ => frame.render_widget(hints(&active_bindings(model)), footer),
     }
 
     match model.overlay() {
@@ -49,10 +51,11 @@ pub fn view(model: &Model, frame: &mut Frame) {
     }
 }
 
-/// Suggested key of each global binding.
-fn hints() -> Line<'static> {
-    let hints = keymap::GLOBAL
+/// Suggested key of each active binding.
+fn hints(groups: &[&[Binding]]) -> Line<'static> {
+    let hints = groups
         .iter()
+        .flat_map(|bindings| bindings.iter())
         .filter_map(|binding| {
             let key = binding.keys.first()?;
             Some(format!("{key} {}", binding.description))
@@ -75,7 +78,7 @@ mod test {
     };
 
     fn render(model: &Model) -> Terminal<TestBackend> {
-        let mut terminal = Terminal::new(TestBackend::new(70, 8)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(70, 12)).unwrap();
         terminal.draw(|frame| view(model, frame)).unwrap();
         terminal
     }
@@ -113,6 +116,16 @@ mod test {
         let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
         let mut model = Model::new(config, Some(target.unwrap()));
         let _ = crate::tui::update(&mut model, crate::tui::Message::OpenTargetPicker);
+        assert_snapshot!(render(&model).backend());
+    }
+
+    #[test]
+    fn test_view_while_editing() {
+        let mut model = Model::default();
+        let _ = crate::tui::update(
+            &mut model,
+            crate::tui::Message::Editor(crate::tui::query_editor::EditorMsg::StartEditing),
+        );
         assert_snapshot!(render(&model).backend());
     }
 

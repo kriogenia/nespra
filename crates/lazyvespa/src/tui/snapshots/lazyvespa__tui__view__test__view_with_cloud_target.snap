@@ -3,10 +3,14 @@ source: crates/lazyvespa/src/tui/view.rs
 expression: render(&model).backend()
 ---
 " lazyvespa  prod  cloud acme.search.default  https://abc.vespa-app.clo"
-"┌────────────────────────────────────────────────────────────────────┐"
+"┌ Query ─────────────────────────────────────────────────────────────┐"
+"│select * from sources * where true                                  │"
+"│                                                                    │"
 "│                                                                    │"
 "│                                                                    │"
 "│                                                                    │"
 "│                                                                    │"
 "└────────────────────────────────────────────────────────────────────┘"
-" : command · T targets · ? help · q quit                              "
+"                                                                      "
+"                                                                      "
+" i edit query · : command · T targets · ? help · q quit               "

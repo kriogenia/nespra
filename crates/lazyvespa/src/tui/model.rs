@@ -1,4 +1,4 @@
-use super::{palette::Palette, target_picker::TargetPicker};
+use super::{palette::Palette, query_editor::QueryEditor, target_picker::TargetPicker};
 use crate::core::{config::Config, connection::ActiveTarget};
 
 /// State of the whole application.
@@ -9,6 +9,7 @@ pub struct Model {
     target: Option<ActiveTarget>,
     overlay: Option<Overlay>,
     notice: Option<Notice>,
+    editor: QueryEditor,
 }
 
 /// Message for the user about the last action.
@@ -68,6 +69,16 @@ impl Model {
     /// Overlay currently open.
     pub fn overlay(&self) -> Option<&Overlay> {
         self.overlay.as_ref()
+    }
+
+    /// Editor of the query.
+    pub fn editor(&self) -> &QueryEditor {
+        &self.editor
+    }
+
+    /// Editor of the query, to update it.
+    pub(super) fn editor_mut(&mut self) -> &mut QueryEditor {
+        &mut self.editor
     }
 
     /// Message for the user about the last action, like an error.

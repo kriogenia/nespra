@@ -3,10 +3,14 @@ source: crates/lazyvespa/src/tui/view.rs
 expression: render(&model).backend()
 ---
 " lazyvespa  local  self-hosted  http://localhost:8080                 "
-"┌────────────────────────────────────────────────────────────────────┐"
+"┌ Query ─────────────────────────────────────────────────────────────┐"
+"│select * from sources * where true                                  │"
+"│                                                                    │"
 "│                   ┌ Targets ───────────────────┐                   │"
 "│                   │> local ●                   │                   │"
 "│                   │  prod                      │                   │"
 "│                   └────────────────────────────┘                   │"
 "└────────────────────────────────────────────────────────────────────┘"
-" : command · T targets · ? help · q quit                              "
+"                                                                      "
+"                                                                      "
+" j next · k previous · Enter connect · Esc close · : command · T targe"

@@ -5,6 +5,7 @@ use super::{
     keymap::{self, Binding},
     model::{Notice, Overlay},
     palette::{self, Command},
+    query_editor::EditorMsg,
 };
 
 /// Applies a message to the model. It is the only place where the state changes, and it
@@ -30,6 +31,7 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
                 Err(error) => model.set_notice(Notice::Error(error.to_string())),
             }
         }
+        Message::Editor(message) => model.editor_mut().update(message),
         Message::OpenTargetPicker => model.open_target_picker(),
         Message::Picker(message) => {
             let Some(name) = model.target_picker_mut().and_then(|p| p.update(message)) else {
@@ -73,19 +75,21 @@ pub(super) fn active_bindings(model: &Model) -> Vec<&'static [Binding]> {
             vec![keymap::TARGET_PICKER, keymap::OVERLAY, keymap::GLOBAL]
         }
         Some(_) => vec![keymap::OVERLAY, keymap::GLOBAL],
-        None => vec![keymap::GLOBAL],
+        None if model.editor().is_editing() => vec![keymap::EDITING],
+        None => vec![keymap::EDITOR, keymap::GLOBAL],
     }
 }
 
-/// Message of the key in the current state. While typing in the palette, the keys that
-/// are not bound by the overlay are text.
+/// Message of the key in the current state. While typing in the palette or the editor,
+/// the keys that are not bound are text.
 fn key_message(model: &Model, key: &KeyEvent) -> Option<Message> {
-    if let Some(Overlay::Palette(_)) = model.overlay() {
-        keymap::message(&[keymap::OVERLAY], key)
+    match model.overlay() {
+        Some(Overlay::Palette(_)) => keymap::message(&[keymap::OVERLAY], key)
             .or_else(|| palette::key_message(key).map(Message::Palette))
-            .or_else(|| keymap::message(&[keymap::GLOBAL], key))
-    } else {
-        keymap::message(&active_bindings(model), key)
+            .or_else(|| keymap::message(&[keymap::GLOBAL], key)),
+        None if model.editor().is_editing() => keymap::message(&[keymap::EDITING], key)
+            .or(Some(Message::Editor(EditorMsg::Input(*key)))),
+        _ => keymap::message(&active_bindings(model), key),
     }
 }
 
@@ -238,6 +242,37 @@ mod test {
         let mut model = Model::new(config(), None);
         assert!(run_command(&mut model, "ctx").is_empty());
         assert!(matches!(model.overlay(), Some(Overlay::TargetPicker(_))));
+    }
+
+    #[test]
+    fn test_edit_the_query() {
+        let mut model = Model::default();
+        let _ = press(&mut model, KeyCode::Char('i'));
+        assert!(model.editor().is_editing());
+        // Shortcuts are text while editing
+        let _ = type_text(&mut model, " q?T");
+        let _ = press(&mut model, KeyCode::Esc);
+        assert!(!model.editor().is_editing());
+        assert!(model.is_running());
+        assert!(
+            model.editor().yql().ends_with(" q?T"),
+            "{}",
+            model.editor().yql()
+        );
+        // and shortcuts again after editing
+        let _ = press(&mut model, KeyCode::Char('q'));
+        assert!(!model.is_running());
+    }
+
+    #[test]
+    fn test_ctrl_c_quits_while_editing() {
+        let mut model = Model::default();
+        let _ = press(&mut model, KeyCode::Enter);
+        let _ = update(
+            &mut model,
+            Message::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+        );
+        assert!(!model.is_running());
     }
 
     #[test]

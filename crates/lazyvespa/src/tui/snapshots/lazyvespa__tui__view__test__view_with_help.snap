@@ -3,10 +3,14 @@ source: crates/lazyvespa/src/tui/view.rs
 expression: render(&model).backend()
 ---
 " lazyvespa  no target, use --url or --target                          "
-"┌────────────────┌ Keys ────────────────────────────┐────────────────┐"
+"┌ Query ─────────────────────────────────────────────────────────────┐"
+"│select * from sources * where true                                  │"
+"│                ┌ Keys ────────────────────────────┐                │"
 "│                │       Esc  close                 │                │"
 "│                │         :  command               │                │"
 "│                │         T  targets               │                │"
 "│                │         ?  help                  │                │"
 "└────────────────│ q, Ctrl+C  quit                  │────────────────┘"
-" : command · T ta└──────────────────────────────────┘                 "
+"                 └──────────────────────────────────┘                 "
+"                                                                      "
+" Esc close · : command · T targets · ? help · q quit                  "

@@ -1,0 +1,16 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+" lazyvespa  no target, use --url or --target                          "
+"┌ Query · editing ───────────────────────────────────────────────────┐"
+"│select * from sources * where true                                  │"
+"│                                                                    │"
+"│                                                                    │"
+"│                                                                    │"
+"│                                                                    │"
+"│                                                                    │"
+"└────────────────────────────────────────────────────────────────────┘"
+"                                                                      "
+"                                                                      "
+" Esc stop editing · Ctrl+C quit                                       "
