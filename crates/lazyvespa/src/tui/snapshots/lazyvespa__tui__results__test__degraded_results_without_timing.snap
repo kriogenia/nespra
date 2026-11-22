@@ -4,8 +4,8 @@ expression: render_state(&search)
 ---
 "┌ Results ─────────────────────────────────────────────────────────────────────┐"
 "│0 hits · coverage 50% · degraded · 23 ms round trip                           │"
-"│#    relevance  id                                             source         │"
-"│                                                                              │"
-"│                                                                              │"
-"│                                                                              │"
+"│#    relevance  id                sourc│null                                  │"
+"│                                       │                                      │"
+"│                                       │                                      │"
+"│                                       │                                      │"
 "└──────────────────────────────────────────────────────────────────────────────┘"

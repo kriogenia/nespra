@@ -5,7 +5,10 @@ use std::fmt;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{Message, params_form::ParamsMsg, query_editor::EditorMsg, target_picker::PickerMsg};
+use super::{
+    Message, params_form::ParamsMsg, query_editor::EditorMsg, results::ResultsMsg,
+    target_picker::PickerMsg,
+};
 
 /// A key, optionally pressed together with modifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,11 +166,38 @@ pub const EDITOR_PARAMS: &[Binding] = &[
 ];
 
 /// Bindings of the results.
-pub const RESULTS: &[Binding] = &[Binding {
-    keys: &[Key::new(KeyCode::Tab)],
-    message: Message::FocusNext,
-    description: "query",
-}];
+pub const RESULTS: &[Binding] = &[
+    Binding {
+        keys: &[Key::char('j'), Key::new(KeyCode::Down)],
+        message: Message::Results(ResultsMsg::Next),
+        description: "next",
+    },
+    Binding {
+        keys: &[Key::char('k'), Key::new(KeyCode::Up)],
+        message: Message::Results(ResultsMsg::Previous),
+        description: "previous",
+    },
+    Binding {
+        keys: &[Key::ctrl('d'), Key::new(KeyCode::PageDown)],
+        message: Message::Results(ResultsMsg::ScrollDown),
+        description: "scroll down",
+    },
+    Binding {
+        keys: &[Key::ctrl('u'), Key::new(KeyCode::PageUp)],
+        message: Message::Results(ResultsMsg::ScrollUp),
+        description: "scroll up",
+    },
+    Binding {
+        keys: &[Key::char('r')],
+        message: Message::Results(ResultsMsg::ToggleRaw),
+        description: "raw",
+    },
+    Binding {
+        keys: &[Key::new(KeyCode::Tab)],
+        message: Message::FocusNext,
+        description: "query",
+    },
+];
 
 /// Bindings while typing a parameter, on top of the ones of the edit mode.
 pub const EDITING_PARAM: &[Binding] = &[Binding {

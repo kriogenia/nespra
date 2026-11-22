@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use crossterm::event::KeyEvent;
 
-use super::{palette::PaletteMsg, query_editor::EditorMsg, target_picker::PickerMsg};
+use super::{
+    palette::PaletteMsg, query_editor::EditorMsg, results::ResultsMsg, target_picker::PickerMsg,
+};
 use crate::core::{connection::ActiveTarget, search::SearchOutcome};
 
 /// Something that happened and the application reacts to.
@@ -18,6 +20,8 @@ pub enum Message {
     Palette(PaletteMsg),
     /// Message of the query editor.
     Editor(EditorMsg),
+    /// Message of the results view.
+    Results(ResultsMsg),
     /// Move the focus to the next part of the screen: YQL, parameters, results.
     FocusNext,
     /// Open the list of targets.

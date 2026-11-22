@@ -32,6 +32,7 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             }
         }
         Message::Editor(message) => model.editor_mut().update(message),
+        Message::Results(message) => model.update_results(message),
         Message::FocusNext => focus_next(model),
         Message::OpenTargetPicker => model.open_target_picker(),
         Message::Picker(message) => {
@@ -443,6 +444,24 @@ mod test {
         );
         assert_eq!(model.pane(), Pane::Editor);
         assert!(model.editor().is_editing());
+    }
+
+    #[test]
+    fn test_navigate_the_results() {
+        let mut model = connected();
+        let _ = update(&mut model, Message::RunQuery);
+        let _ = update(
+            &mut model,
+            Message::SearchDone {
+                id: 1,
+                result: Ok(outcome(1)),
+            },
+        );
+        let _ = press(&mut model, KeyCode::Char('r'));
+        assert!(model.results().is_raw());
+        // A new search shows the hits again
+        let _ = update(&mut model, Message::RunQuery);
+        assert!(!model.results().is_raw());
     }
 
     #[test]

@@ -27,7 +27,13 @@ pub fn view(model: &Model, frame: &mut Frame) {
         Layout::vertical([Constraint::Length(8), Constraint::Fill(1)]).areas(main);
     let pane = model.pane();
     model.editor().render(frame, editor, pane == Pane::Editor);
-    results::render(model.search(), frame, results, pane == Pane::Results);
+    results::render(
+        model.search(),
+        model.results(),
+        frame,
+        results,
+        pane == Pane::Results,
+    );
     match (model.overlay(), model.notice()) {
         (Some(Overlay::Palette(palette)), _) => {
             let line = format!(":{}", palette.input());

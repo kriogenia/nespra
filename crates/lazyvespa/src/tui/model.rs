@@ -1,6 +1,11 @@
 use std::sync::Arc;
 
-use super::{palette::Palette, query_editor::QueryEditor, target_picker::TargetPicker};
+use super::{
+    palette::Palette,
+    query_editor::QueryEditor,
+    results::{ResultsMsg, ResultsView},
+    target_picker::TargetPicker,
+};
 use crate::core::{config::Config, connection::ActiveTarget, search::SearchOutcome};
 
 /// State of the whole application.
@@ -14,6 +19,7 @@ pub struct Model {
     editor: QueryEditor,
     search: SearchState,
     searches: u64,
+    results: ResultsView,
     pane: Pane,
 }
 
@@ -119,6 +125,7 @@ impl Model {
     pub(super) fn set_target(&mut self, target: ActiveTarget) {
         self.target = Some(target);
         self.search = SearchState::Idle;
+        self.results = ResultsView::default();
     }
 
     /// Part of the screen receiving the keys.
@@ -136,10 +143,25 @@ impl Model {
         &self.search
     }
 
+    /// View of the results.
+    pub fn results(&self) -> &ResultsView {
+        &self.results
+    }
+
+    /// Applies a message to the view of the results of the last search.
+    pub(super) fn update_results(&mut self, message: ResultsMsg) {
+        let outcome = match &self.search {
+            SearchState::Done(outcome) => Some(outcome.as_ref()),
+            _ => None,
+        };
+        self.results.update(message, outcome);
+    }
+
     /// Starts a new search, returning its identifier.
     pub(super) fn start_search(&mut self) -> u64 {
         self.searches += 1;
         self.search = SearchState::Running(self.searches);
+        self.results = ResultsView::default();
         self.searches
     }
 
