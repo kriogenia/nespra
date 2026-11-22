@@ -28,3 +28,4 @@ toml = "1.2.1"
 [dev-dependencies]
 insta = "1.49.0"
 tempfile = "3.27.0"
+wiremock = "0.6.5"

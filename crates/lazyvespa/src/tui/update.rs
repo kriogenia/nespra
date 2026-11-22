@@ -52,10 +52,45 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             model.set_target(*target);
         }
         Message::TargetOpened(Err(error)) => model.set_notice(Notice::Error(error)),
+        Message::RunQuery => return run_query(model),
+        Message::SearchDone { id, result } => {
+            let notice = match &result {
+                Ok(outcome) => Notice::Info(format!(
+                    "{} hits · {} ms",
+                    outcome.response.total_count(),
+                    outcome.elapsed.as_millis()
+                )),
+                Err(error) => Notice::Error(error.clone()),
+            };
+            if model.finish_search(id, result) {
+                model.set_notice(notice);
+            }
+        }
         Message::CloseOverlay => model.close_overlay(),
         Message::Quit => model.quit(),
     }
     Vec::new()
+}
+
+/// Searches the query of the editor in the target.
+fn run_query(model: &mut Model) -> Vec<Effect> {
+    let Some(vespa) = model.target().map(|active| active.connection.vespa.clone()) else {
+        model.set_notice(Notice::Error(
+            "Not connected to a target, press T to pick one".to_string(),
+        ));
+        return Vec::new();
+    };
+    match model.editor().draft().request() {
+        Ok(request) => {
+            let id = model.start_search();
+            model.set_notice(Notice::Info("Searching…".to_string()));
+            vec![Effect::Search { id, vespa, request }]
+        }
+        Err(error) => {
+            model.set_notice(Notice::Error(error.to_string()));
+            Vec::new()
+        }
+    }
 }
 
 /// Message running the command of the palette.
@@ -105,9 +140,14 @@ mod test {
     use crossterm::event::{KeyCode, KeyModifiers};
 
     use super::*;
+    use std::{sync::Arc, time::Duration};
+
+    use crate::tui::model::SearchState;
+
     use crate::core::{
         config::{Config, Target},
         connection::ActiveTarget,
+        search::SearchOutcome,
     };
 
     fn press(model: &mut Model, code: KeyCode) -> Vec<Effect> {
@@ -213,13 +253,11 @@ mod test {
     fn test_switch_to_a_target_opens_it() {
         let mut model = Model::new(config(), None);
         let effects = run_command(&mut model, "ctx local");
-        assert_eq!(
-            effects,
-            vec![Effect::OpenTarget {
-                name: "local".to_string(),
-                target: Target::self_hosted("http://localhost:8080"),
-            }]
-        );
+        assert!(matches!(
+            effects.as_slice(),
+            [Effect::OpenTarget { name, target }]
+                if name == "local" && *target == Target::self_hosted("http://localhost:8080")
+        ));
         assert!(model.target().is_none(), "connected only once it is opened");
     }
 
@@ -298,6 +336,102 @@ mod test {
             Message::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)),
         );
         assert!(!model.is_running());
+    }
+
+    fn connected() -> Model {
+        let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
+        Model::new(config(), Some(target.unwrap()))
+    }
+
+    fn outcome(total: i32) -> Arc<SearchOutcome> {
+        let response = serde_json::from_value(serde_json::json!({
+            "root": {"relevance": 1.0, "fields": {"totalCount": total}}
+        }));
+        Arc::new(SearchOutcome {
+            response: response.unwrap(),
+            elapsed: Duration::from_millis(12),
+        })
+    }
+
+    #[test]
+    fn test_run_the_query() {
+        let mut model = connected();
+        let effects = update(&mut model, Message::RunQuery);
+        let [Effect::Search { id, request, .. }] = effects.as_slice() else {
+            panic!("a search must be run, got {effects:?}");
+        };
+        assert_eq!(request.yql, model.editor().yql());
+        assert!(matches!(model.search(), SearchState::Running(running) if running == id));
+
+        let id = *id;
+        let _ = update(
+            &mut model,
+            Message::SearchDone {
+                id,
+                result: Ok(outcome(3)),
+            },
+        );
+        assert!(matches!(model.search(), SearchState::Done(_)));
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info("3 hits · 12 ms".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_run_with_ctrl_r_while_editing() {
+        let mut model = connected();
+        let _ = press(&mut model, KeyCode::Char('i'));
+        let effects = update(
+            &mut model,
+            Message::Key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL)),
+        );
+        assert!(matches!(effects.as_slice(), [Effect::Search { .. }]));
+        assert!(model.editor().is_editing());
+    }
+
+    #[test]
+    fn test_answers_of_older_searches_are_ignored() {
+        let mut model = connected();
+        let _ = update(&mut model, Message::RunQuery);
+        let _ = update(&mut model, Message::RunQuery);
+        let _ = update(
+            &mut model,
+            Message::SearchDone {
+                id: 1,
+                result: Ok(outcome(1)),
+            },
+        );
+        assert!(matches!(model.search(), SearchState::Running(2)));
+        let error = Err("Search failed: timeout".to_string());
+        let _ = update(
+            &mut model,
+            Message::SearchDone {
+                id: 2,
+                result: error,
+            },
+        );
+        assert!(matches!(model.search(), SearchState::Failed(_)));
+        assert!(matches!(model.notice(), Some(Notice::Error(_))));
+    }
+
+    #[test]
+    fn test_run_without_target() {
+        let mut model = Model::new(config(), None);
+        assert!(update(&mut model, Message::RunQuery).is_empty());
+        assert!(matches!(model.notice(), Some(Notice::Error(_))));
+    }
+
+    #[test]
+    fn test_run_an_invalid_query() {
+        let mut model = connected();
+        let _ = press(&mut model, KeyCode::Tab);
+        let _ = press(&mut model, KeyCode::Char('j'));
+        let _ = press(&mut model, KeyCode::Enter);
+        let _ = type_text(&mut model, "many");
+        assert!(update(&mut model, Message::RunQuery).is_empty());
+        assert!(matches!(model.search(), SearchState::Idle));
+        assert!(matches!(model.notice(), Some(Notice::Error(e)) if e.contains("hits")));
     }
 
     #[test]

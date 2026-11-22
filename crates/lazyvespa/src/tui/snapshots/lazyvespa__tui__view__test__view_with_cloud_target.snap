@@ -13,4 +13,4 @@ expression: render(&model).backend()
 "└────────────────────────────────────────────────┘└──────────────────────────────────────┘"
 "                                                                                          "
 "                                                                                          "
-" i edit · Tab parameters · : command · T targets · ? help · q quit                        "
+" i edit · Tab parameters · Ctrl+R run · : command · T targets · ? help · q quit           "

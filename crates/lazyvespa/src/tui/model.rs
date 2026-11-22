@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 use super::{palette::Palette, query_editor::QueryEditor, target_picker::TargetPicker};
-use crate::core::{config::Config, connection::ActiveTarget};
+use crate::core::{config::Config, connection::ActiveTarget, search::SearchOutcome};
 
 /// State of the whole application.
 #[derive(Debug, Default)]
@@ -10,6 +12,22 @@ pub struct Model {
     overlay: Option<Overlay>,
     notice: Option<Notice>,
     editor: QueryEditor,
+    search: SearchState,
+    searches: u64,
+}
+
+/// State of the last search.
+#[derive(Debug, Clone, Default)]
+pub enum SearchState {
+    /// No search was run.
+    #[default]
+    Idle,
+    /// Waiting for the answer of the search with this identifier.
+    Running(u64),
+    /// The search succeeded.
+    Done(Arc<SearchOutcome>),
+    /// The search failed.
+    Failed(String),
 }
 
 /// Message for the user about the last action.
@@ -86,9 +104,38 @@ impl Model {
         self.notice.as_ref()
     }
 
-    /// Replaces the target the application is connected to.
+    /// Replaces the target the application is connected to, forgetting the last search.
     pub(super) fn set_target(&mut self, target: ActiveTarget) {
         self.target = Some(target);
+        self.search = SearchState::Idle;
+    }
+
+    /// State of the last search.
+    pub fn search(&self) -> &SearchState {
+        &self.search
+    }
+
+    /// Starts a new search, returning its identifier.
+    pub(super) fn start_search(&mut self) -> u64 {
+        self.searches += 1;
+        self.search = SearchState::Running(self.searches);
+        self.searches
+    }
+
+    /// Stores the result of the search if it is the one running, returning whether it was.
+    pub(super) fn finish_search(
+        &mut self,
+        id: u64,
+        result: Result<Arc<SearchOutcome>, String>,
+    ) -> bool {
+        if !matches!(self.search, SearchState::Running(running) if running == id) {
+            return false;
+        }
+        self.search = match result {
+            Ok(outcome) => SearchState::Done(outcome),
+            Err(error) => SearchState::Failed(error),
+        };
+        true
     }
 
     /// Opens the help, or closes it if it is already open.

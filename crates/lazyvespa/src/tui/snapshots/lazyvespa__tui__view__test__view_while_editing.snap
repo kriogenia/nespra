@@ -13,4 +13,4 @@ expression: render(&model).backend()
 "└────────────────────────────────────────────────┘└──────────────────────────────────────┘"
 "                                                                                          "
 "                                                                                          "
-" Esc stop editing · Ctrl+C quit                                                           "
+" Ctrl+R run · Esc stop editing · Ctrl+C quit                                              "

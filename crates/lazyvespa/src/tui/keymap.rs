@@ -81,6 +81,11 @@ pub struct Binding {
 /// Bindings available everywhere.
 pub const GLOBAL: &[Binding] = &[
     Binding {
+        keys: &[Key::ctrl('r'), Key::new(KeyCode::F(5))],
+        message: Message::RunQuery,
+        description: "run",
+    },
+    Binding {
         keys: &[Key::char(':')],
         message: Message::OpenPalette,
         description: "command",
@@ -166,6 +171,11 @@ pub const EDITING_PARAM: &[Binding] = &[Binding {
 
 /// Bindings while typing in the query editor. Any other key is text.
 pub const EDITING: &[Binding] = &[
+    Binding {
+        keys: &[Key::ctrl('r'), Key::new(KeyCode::F(5))],
+        message: Message::RunQuery,
+        description: "run",
+    },
     Binding {
         keys: &[Key::new(KeyCode::Esc)],
         message: Message::Editor(EditorMsg::StopEditing),

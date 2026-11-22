@@ -4,3 +4,4 @@ pub mod cloud;
 pub mod config;
 pub mod connection;
 pub mod query;
+pub mod search;
