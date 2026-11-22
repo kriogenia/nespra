@@ -49,8 +49,8 @@ pub enum EditorMsg {
     StopEditing,
     /// Key typed while editing.
     Input(KeyEvent),
-    /// Move the focus between the YQL and the parameters.
-    SwitchFocus,
+    /// Move the focus to a part of the editor.
+    Focus(Focus),
     /// Add a parameter and start editing its name.
     AddParam,
     /// Message of the parameters form.
@@ -123,13 +123,8 @@ impl QueryEditor {
                 Focus::Params => self.params.input(&key),
             },
             EditorMsg::Input(_) => {}
-            EditorMsg::SwitchFocus if !self.editing => {
-                self.focus = match self.focus {
-                    Focus::Yql => Focus::Params,
-                    Focus::Params => Focus::Yql,
-                };
-            }
-            EditorMsg::SwitchFocus => {}
+            EditorMsg::Focus(focus) if !self.editing => self.focus = focus,
+            EditorMsg::Focus(_) => {}
             EditorMsg::AddParam => {
                 self.focus = Focus::Params;
                 self.params.add();
@@ -151,12 +146,13 @@ impl QueryEditor {
         self.yql.set_cursor_line_style(Style::new());
     }
 
-    /// Renders the editor in the area: the YQL and, at its right, the parameters.
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
+    /// Renders the editor in the area: the YQL and, at its right, the parameters. The
+    /// part with the focus is highlighted when the editor is focused.
+    pub fn render(&self, frame: &mut Frame, area: Rect, focused: bool) {
         let [yql, params] =
             Layout::horizontal([Constraint::Fill(1), Constraint::Length(PARAMS_WIDTH)]).areas(area);
 
-        let block = self.block(Focus::Yql, " Query ");
+        let block = self.block(Focus::Yql, " Query ", focused);
         let inner = block.inner(yql);
         frame.render_widget(block, yql);
         frame.render_widget(&self.yql, inner);
@@ -165,15 +161,15 @@ impl QueryEditor {
             frame.buffer_mut().set_style(inner, Style::new().dim());
         }
 
-        let focused = self.focus == Focus::Params;
-        let block = self.block(Focus::Params, " Parameters ");
+        let focused = focused && self.focus == Focus::Params;
+        let block = self.block(Focus::Params, " Parameters ", focused);
         self.params
             .render(frame, params, block, focused, focused && self.editing);
     }
 
     /// Border of a part of the editor, highlighted when it has the focus.
-    fn block(&self, part: Focus, title: &'static str) -> Block<'static> {
-        match (self.focus == part, self.editing) {
+    fn block(&self, part: Focus, title: &'static str, focused: bool) -> Block<'static> {
+        match (focused && self.focus == part, self.editing) {
             (true, true) => Block::bordered()
                 .title(format!("{title}· editing "))
                 .border_style(Style::new().fg(Color::Yellow)),
@@ -212,7 +208,7 @@ mod test {
     #[test]
     fn test_draft() {
         let mut editor = QueryEditor::default();
-        editor.update(EditorMsg::SwitchFocus);
+        editor.update(EditorMsg::Focus(Focus::Params));
         editor.update(EditorMsg::Params(ParamsMsg::Next));
         editor.update(EditorMsg::StartEditing);
         editor.update(key(KeyCode::Char('3')));
@@ -227,10 +223,10 @@ mod test {
     fn test_focus_does_not_move_while_editing() {
         let mut editor = QueryEditor::default();
         editor.update(EditorMsg::StartEditing);
-        editor.update(EditorMsg::SwitchFocus);
+        editor.update(EditorMsg::Focus(Focus::Params));
         assert_eq!(editor.focus(), Focus::Yql);
         editor.update(EditorMsg::StopEditing);
-        editor.update(EditorMsg::SwitchFocus);
+        editor.update(EditorMsg::Focus(Focus::Params));
         assert_eq!(editor.focus(), Focus::Params);
     }
 

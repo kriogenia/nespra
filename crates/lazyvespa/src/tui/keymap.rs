@@ -123,7 +123,7 @@ pub const EDITOR_YQL: &[Binding] = &[
     },
     Binding {
         keys: &[Key::new(KeyCode::Tab)],
-        message: Message::Editor(EditorMsg::SwitchFocus),
+        message: Message::FocusNext,
         description: "parameters",
     },
 ];
@@ -157,10 +157,17 @@ pub const EDITOR_PARAMS: &[Binding] = &[
     },
     Binding {
         keys: &[Key::new(KeyCode::Tab)],
-        message: Message::Editor(EditorMsg::SwitchFocus),
-        description: "query",
+        message: Message::FocusNext,
+        description: "results",
     },
 ];
+
+/// Bindings of the results.
+pub const RESULTS: &[Binding] = &[Binding {
+    keys: &[Key::new(KeyCode::Tab)],
+    message: Message::FocusNext,
+    description: "query",
+}];
 
 /// Bindings while typing a parameter, on top of the ones of the edit mode.
 pub const EDITING_PARAM: &[Binding] = &[Binding {

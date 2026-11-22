@@ -14,6 +14,17 @@ pub struct Model {
     editor: QueryEditor,
     search: SearchState,
     searches: u64,
+    pane: Pane,
+}
+
+/// Part of the screen receiving the keys.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Pane {
+    /// The query editor.
+    #[default]
+    Editor,
+    /// The results of the search.
+    Results,
 }
 
 /// State of the last search.
@@ -108,6 +119,16 @@ impl Model {
     pub(super) fn set_target(&mut self, target: ActiveTarget) {
         self.target = Some(target);
         self.search = SearchState::Idle;
+    }
+
+    /// Part of the screen receiving the keys.
+    pub fn pane(&self) -> Pane {
+        self.pane
+    }
+
+    /// Moves the focus to a part of the screen.
+    pub(super) fn focus_pane(&mut self, pane: Pane) {
+        self.pane = pane;
     }
 
     /// State of the last search.

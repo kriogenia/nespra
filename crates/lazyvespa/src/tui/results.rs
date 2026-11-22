@@ -3,7 +3,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Style, Stylize},
+    style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Paragraph, Row, Table, Wrap},
 };
@@ -12,9 +12,12 @@ use serde_json::Value;
 use super::model::SearchState;
 use crate::core::search::SearchOutcome;
 
-/// Renders the state of the last search in the area.
-pub(super) fn render(search: &SearchState, frame: &mut Frame, area: Rect) {
-    let block = Block::bordered().title(" Results ");
+/// Renders the state of the last search in the area, highlighted when focused.
+pub(super) fn render(search: &SearchState, frame: &mut Frame, area: Rect, focused: bool) {
+    let mut block = Block::bordered().title(" Results ");
+    if focused {
+        block = block.border_style(Style::new().fg(Color::Cyan));
+    }
     match search {
         SearchState::Idle => {
             let hint = Paragraph::new(Line::from(" Ctrl+R to run the query").dim());
@@ -110,7 +113,7 @@ mod test {
     fn render_state(search: &SearchState) -> String {
         let mut terminal = Terminal::new(TestBackend::new(80, 7)).unwrap();
         terminal
-            .draw(|frame| render(search, frame, frame.area()))
+            .draw(|frame| render(search, frame, frame.area(), false))
             .unwrap();
         terminal.backend().to_string()
     }

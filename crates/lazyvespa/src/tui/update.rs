@@ -3,7 +3,7 @@ use crossterm::event::KeyEvent;
 use super::{
     Effect, Message, Model,
     keymap::{self, Binding},
-    model::{Notice, Overlay},
+    model::{Notice, Overlay, Pane},
     palette::{self, Command},
     query_editor::{EditorMsg, Focus},
 };
@@ -32,6 +32,7 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             }
         }
         Message::Editor(message) => model.editor_mut().update(message),
+        Message::FocusNext => focus_next(model),
         Message::OpenTargetPicker => model.open_target_picker(),
         Message::Picker(message) => {
             let Some(name) = model.target_picker_mut().and_then(|p| p.update(message)) else {
@@ -62,14 +63,30 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
                 )),
                 Err(error) => Notice::Error(error.clone()),
             };
+            let succeeded = result.is_ok();
             if model.finish_search(id, result) {
                 model.set_notice(notice);
+                if succeeded && !model.editor().is_editing() {
+                    model.focus_pane(Pane::Results);
+                }
             }
         }
         Message::CloseOverlay => model.close_overlay(),
         Message::Quit => model.quit(),
     }
     Vec::new()
+}
+
+/// Moves the focus in a cycle: YQL, parameters, results.
+fn focus_next(model: &mut Model) {
+    match (model.pane(), model.editor().focus()) {
+        (Pane::Editor, Focus::Yql) => model.editor_mut().update(EditorMsg::Focus(Focus::Params)),
+        (Pane::Editor, Focus::Params) => model.focus_pane(Pane::Results),
+        (Pane::Results, _) => {
+            model.focus_pane(Pane::Editor);
+            model.editor_mut().update(EditorMsg::Focus(Focus::Yql));
+        }
+    }
 }
 
 /// Searches the query of the editor in the target.
@@ -110,6 +127,7 @@ pub(super) fn active_bindings(model: &Model) -> Vec<&'static [Binding]> {
             vec![keymap::TARGET_PICKER, keymap::OVERLAY, keymap::GLOBAL]
         }
         Some(_) => vec![keymap::OVERLAY, keymap::GLOBAL],
+        None if model.pane() == Pane::Results => vec![keymap::RESULTS, keymap::GLOBAL],
         None => {
             let editor = model.editor();
             match (editor.focus(), editor.is_editing()) {
@@ -376,6 +394,55 @@ mod test {
             model.notice(),
             Some(&Notice::Info("3 hits · 12 ms".to_string()))
         );
+    }
+
+    #[test]
+    fn test_tab_cycles_the_focus() {
+        let mut model = Model::default();
+        let mut visited = Vec::new();
+        for _ in 0..4 {
+            visited.push((model.pane(), model.editor().focus()));
+            let _ = press(&mut model, KeyCode::Tab);
+        }
+        assert_eq!(
+            visited,
+            [
+                (Pane::Editor, Focus::Yql),
+                (Pane::Editor, Focus::Params),
+                (Pane::Results, Focus::Params),
+                (Pane::Editor, Focus::Yql),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_results_are_focused_when_the_search_succeeds() {
+        let mut model = connected();
+        let _ = update(&mut model, Message::RunQuery);
+        let _ = update(
+            &mut model,
+            Message::SearchDone {
+                id: 1,
+                result: Ok(outcome(1)),
+            },
+        );
+        assert_eq!(model.pane(), Pane::Results);
+    }
+
+    #[test]
+    fn test_editing_keeps_the_focus_when_the_search_succeeds() {
+        let mut model = connected();
+        let _ = press(&mut model, KeyCode::Char('i'));
+        let _ = update(&mut model, Message::RunQuery);
+        let _ = update(
+            &mut model,
+            Message::SearchDone {
+                id: 1,
+                result: Ok(outcome(1)),
+            },
+        );
+        assert_eq!(model.pane(), Pane::Editor);
+        assert!(model.editor().is_editing());
     }
 
     #[test]

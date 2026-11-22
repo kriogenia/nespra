@@ -8,7 +8,7 @@ use ratatui::{
 use super::{
     Model, help,
     keymap::Binding,
-    model::{Notice, Overlay},
+    model::{Notice, Overlay, Pane},
     results, status_bar,
     update::active_bindings,
 };
@@ -25,8 +25,9 @@ pub fn view(model: &Model, frame: &mut Frame) {
     status_bar::render(model.target(), frame, header);
     let [editor, results] =
         Layout::vertical([Constraint::Length(8), Constraint::Fill(1)]).areas(main);
-    model.editor().render(frame, editor);
-    results::render(model.search(), frame, results);
+    let pane = model.pane();
+    model.editor().render(frame, editor, pane == Pane::Editor);
+    results::render(model.search(), frame, results, pane == Pane::Results);
     match (model.overlay(), model.notice()) {
         (Some(Overlay::Palette(palette)), _) => {
             let line = format!(":{}", palette.input());
@@ -135,8 +136,8 @@ mod test {
     #[test]
     fn test_view_while_editing_a_param() {
         let mut model = Model::default();
+        let _ = crate::tui::update(&mut model, crate::tui::Message::FocusNext);
         for message in [
-            EditorMsg::SwitchFocus,
             EditorMsg::Params(ParamsMsg::Next),
             EditorMsg::StartEditing,
             EditorMsg::Input(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::NONE)),

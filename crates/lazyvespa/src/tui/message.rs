@@ -18,6 +18,8 @@ pub enum Message {
     Palette(PaletteMsg),
     /// Message of the query editor.
     Editor(EditorMsg),
+    /// Move the focus to the next part of the screen: YQL, parameters, results.
+    FocusNext,
     /// Open the list of targets.
     OpenTargetPicker,
     /// Message of the target picker.
