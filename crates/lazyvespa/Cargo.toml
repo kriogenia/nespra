@@ -15,6 +15,7 @@ publish = false
 color-eyre = "0.6.5"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
 futures = "0.3.34"
+nespra = { path = "../client", features = ["admin"] }
 ratatui = "0.30.2"
 serde.workspace = true
 thiserror.workspace = true
@@ -23,3 +24,4 @@ toml = "1.2.1"
 
 [dev-dependencies]
 insta = "1.49.0"
+tempfile = "3.27.0"
