@@ -1,0 +1,10 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: "render(&Model::default()).backend()"
+---
+"┌───────────────────────────────────── no target ┐"
+"│                    lazyvespa                   │"
+"│                                                │"
+"│                                                │"
+"└────────────────────────────────────────────────┘"
+" q quit                                           "

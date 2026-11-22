@@ -9,14 +9,18 @@ use ratatui::{
 use super::Model;
 
 /// Renders the model. It only reads the state, never changes it.
-pub fn view(_model: &Model, frame: &mut Frame) {
+pub fn view(model: &Model, frame: &mut Frame) {
     let [main, footer] =
         Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
 
+    let target = match model.target() {
+        Some(active) => Line::from(format!(" {} · {} ", active.name, active.target.endpoint)),
+        None => Line::from(" no target ").dim(),
+    };
     let title = Paragraph::new("lazyvespa")
         .bold()
         .alignment(Alignment::Center)
-        .block(Block::bordered());
+        .block(Block::bordered().title_top(target.right_aligned()));
     frame.render_widget(title, main);
     frame.render_widget(Line::from(" q quit").dim(), footer);
 }
@@ -28,12 +32,23 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn test_initial_view() {
-        let mut terminal = Terminal::new(TestBackend::new(40, 6)).unwrap();
+    use crate::core::{config::Target, connection::ActiveTarget};
+
+    fn render(model: &Model) -> Terminal<TestBackend> {
+        let mut terminal = Terminal::new(TestBackend::new(50, 6)).unwrap();
+        terminal.draw(|frame| view(model, frame)).unwrap();
         terminal
-            .draw(|frame| view(&Model::default(), frame))
-            .unwrap();
-        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn test_view_without_target() {
+        assert_snapshot!(render(&Model::default()).backend());
+    }
+
+    #[test]
+    fn test_view_with_target() {
+        let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
+        let model = Model::new(Some(target.unwrap()));
+        assert_snapshot!(render(&model).backend());
     }
 }

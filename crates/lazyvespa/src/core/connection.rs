@@ -24,6 +24,32 @@ const USER_AGENT: &str = concat!("lazyvespa/", env!("CARGO_PKG_VERSION"));
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const TIMEOUT: Duration = Duration::from_secs(30);
 
+/// A named target with its clients, ready to be used.
+#[derive(Debug, Clone)]
+pub struct ActiveTarget {
+    /// Name of the target.
+    pub name: String,
+    /// Configuration of the target.
+    pub target: Target,
+    /// Clients of the target.
+    pub connection: Connection,
+}
+
+impl ActiveTarget {
+    /// Opens the connection to the target.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Connection::open`].
+    pub fn open(name: impl Into<String>, target: Target) -> Result<Self, ConnectionError> {
+        Ok(ActiveTarget {
+            name: name.into(),
+            connection: Connection::open(&target)?,
+            target,
+        })
+    }
+}
+
 /// Clients connected to a target.
 #[derive(Debug, Clone)]
 pub struct Connection {

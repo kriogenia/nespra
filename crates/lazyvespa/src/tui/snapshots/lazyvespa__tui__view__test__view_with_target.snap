@@ -1,0 +1,10 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+"┌───────────────── local · http://localhost:8080 ┐"
+"│                    lazyvespa                   │"
+"│                                                │"
+"│                                                │"
+"└────────────────────────────────────────────────┘"
+" q quit                                           "

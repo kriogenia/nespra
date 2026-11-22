@@ -14,11 +14,12 @@
 
 use std::{
     collections::BTreeMap,
+    env,
+    ffi::OsString,
     fs, io,
     path::{Path, PathBuf},
 };
 
-use directories::ProjectDirs;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -33,10 +34,20 @@ pub struct Config {
     pub targets: BTreeMap<String, Target>,
 }
 
-/// Default location of the configuration file, like `~/.config/lazyvespa/config.toml` on
-/// Linux. `None` when the home directory cannot be found.
+/// Default location of the configuration file, `$XDG_CONFIG_HOME/lazyvespa/config.toml`
+/// or `~/.config/lazyvespa/config.toml` on every platform. `None` when the home directory
+/// cannot be found.
 pub fn default_path() -> Option<PathBuf> {
-    ProjectDirs::from("", "", "lazyvespa").map(|dirs| dirs.config_dir().join("config.toml"))
+    config_path(env::var_os("XDG_CONFIG_HOME"), env::home_dir())
+}
+
+fn config_path(xdg_config_home: Option<OsString>, home: Option<PathBuf>) -> Option<PathBuf> {
+    let config_dir = match xdg_config_home {
+        // The specification asks to ignore relative paths
+        Some(dir) if Path::new(&dir).is_absolute() => PathBuf::from(dir),
+        _ => home?.join(".config"),
+    };
+    Some(config_dir.join("lazyvespa").join("config.toml"))
 }
 
 impl Config {
@@ -96,6 +107,23 @@ impl Config {
         }
     }
 
+    /// Target requested by name, or the default one when no name is given. `None` when
+    /// there is no default target.
+    ///
+    /// # Errors
+    ///
+    /// Fails if there is no target with the requested name.
+    pub fn select(&self, name: Option<&str>) -> Result<Option<(&str, &Target)>, ConfigError> {
+        match name {
+            Some(name) => self
+                .targets
+                .get_key_value(name)
+                .map(|(name, target)| Some((name.as_str(), target)))
+                .ok_or_else(|| ConfigError::UnknownTarget(name.to_string())),
+            None => Ok(self.default_target()),
+        }
+    }
+
     /// Target with the given name.
     pub fn target(&self, name: &str) -> Option<&Target> {
         self.targets.get(name)
@@ -113,6 +141,17 @@ pub struct Target {
     /// How to authenticate the requests.
     #[serde(default)]
     pub auth: Auth,
+}
+
+impl Target {
+    /// Self-hosted target without authentication.
+    pub fn self_hosted(endpoint: impl Into<String>) -> Self {
+        Target {
+            endpoint: endpoint.into(),
+            cloud: None,
+            auth: Auth::None,
+        }
+    }
 }
 
 /// Instance of an application deployed on [Vespa Cloud](https://cloud.vespa.ai).
@@ -168,6 +207,9 @@ pub enum ConfigError {
     /// The TOML is not valid or does not match the configuration format.
     #[error("Invalid configuration: {0}")]
     Parse(#[from] toml::de::Error),
+    /// The requested target is not one of the targets.
+    #[error("There is no target named {0:?}")]
+    UnknownTarget(String),
     /// The default target is not one of the targets.
     #[error("The default target {0:?} is not defined in the targets")]
     UnknownDefaultTarget(String),
@@ -207,11 +249,37 @@ mod test {
     }
 
     #[test]
-    fn test_default_path() {
-        if let Some(path) = default_path() {
-            assert!(path.ends_with("config.toml"));
-            assert!(path.parent().unwrap().ends_with("lazyvespa"));
-        }
+    fn test_config_path_in_the_home() {
+        let path = config_path(None, Some("/home/me".into()));
+        assert_eq!(path, Some("/home/me/.config/lazyvespa/config.toml".into()));
+    }
+
+    #[test]
+    fn test_config_path_in_xdg_config_home() {
+        let path = config_path(Some("/xdg".into()), Some("/home/me".into()));
+        assert_eq!(path, Some("/xdg/lazyvespa/config.toml".into()));
+    }
+
+    #[test]
+    fn test_relative_xdg_config_home_is_ignored() {
+        let path = config_path(Some("relative".into()), Some("/home/me".into()));
+        assert_eq!(path, Some("/home/me/.config/lazyvespa/config.toml".into()));
+        assert_eq!(config_path(Some("relative".into()), None), None);
+    }
+
+    #[test]
+    fn test_select_a_target() {
+        let config = Config::from_toml(
+            "default_target = \"a\"\n[targets.a]\nendpoint = \"http://a\"\n[targets.b]\nendpoint = \"http://b\"",
+        )
+        .unwrap();
+        assert_eq!(config.select(Some("b")).unwrap().unwrap().0, "b");
+        assert_eq!(config.select(None).unwrap().unwrap().0, "a");
+        assert!(matches!(
+            config.select(Some("c")),
+            Err(ConfigError::UnknownTarget(name)) if name == "c"
+        ));
+        assert_eq!(Config::default().select(None).unwrap(), None);
     }
 
     #[test]

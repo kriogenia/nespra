@@ -1,10 +1,27 @@
+mod cli;
+
+use clap::Parser;
 use color_eyre::Result;
+use lazyvespa::tui::{self, Model};
+
+use crate::cli::Cli;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    color_eyre::install()?;
+    install_error_hooks()?;
+    let target = Cli::parse().open_target()?;
+
     let mut terminal = ratatui::init();
-    let result = lazyvespa::tui::run(&mut terminal).await;
+    let result = tui::run(&mut terminal, Model::new(target)).await;
     ratatui::restore();
     Ok(result?)
+}
+
+/// Reports errors and panics without the hints to enable backtraces, and without the
+/// location in the source code in release builds, as they are noise for the users.
+fn install_error_hooks() -> Result<()> {
+    color_eyre::config::HookBuilder::default()
+        .display_env_section(false)
+        .display_location_section(cfg!(debug_assertions))
+        .install()
 }
