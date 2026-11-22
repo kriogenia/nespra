@@ -7,7 +7,9 @@ mod keymap;
 mod message;
 mod model;
 mod palette;
+mod popup;
 mod status_bar;
+mod target_picker;
 mod update;
 mod view;
 

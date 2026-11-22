@@ -29,8 +29,8 @@ pub enum Command {
     Help,
     /// Close the application.
     Quit,
-    /// Connect to the target with this name.
-    Context(String),
+    /// Connect to the target with this name, or pick one if there is no name.
+    Context(Option<String>),
 }
 
 /// The typed text is not a valid command.
@@ -39,14 +39,6 @@ pub enum CommandError {
     /// There is no command with this name.
     #[error("Unknown command {0:?}")]
     Unknown(String),
-    /// The command needs an argument.
-    #[error("{command} requires {argument}")]
-    MissingArgument {
-        /// Name of the command.
-        command: &'static str,
-        /// What is missing.
-        argument: &'static str,
-    },
 }
 
 impl FromStr for Command {
@@ -59,11 +51,7 @@ impl FromStr for Command {
         match (name, argument) {
             ("help" | "h" | "?", _) => Ok(Command::Help),
             ("quit" | "q" | "q!", _) => Ok(Command::Quit),
-            ("ctx" | "context", Some(target)) => Ok(Command::Context(target.to_string())),
-            ("ctx" | "context", None) => Err(CommandError::MissingArgument {
-                command: "ctx",
-                argument: "the name of a target",
-            }),
+            ("ctx" | "context", target) => Ok(Command::Context(target.map(str::to_string))),
             _ => Err(CommandError::Unknown(s.trim().to_string())),
         }
     }
@@ -142,19 +130,15 @@ mod test {
             ("quit", Command::Quit),
             (" help ", Command::Help),
             ("?", Command::Help),
-            ("ctx prod", Command::Context("prod".to_string())),
-            ("  context   local ", Command::Context("local".to_string())),
+            ("ctx prod", Command::Context(Some("prod".to_string()))),
+            (
+                "  context   local ",
+                Command::Context(Some("local".to_string())),
+            ),
+            ("ctx", Command::Context(None)),
         ] {
             assert_eq!(text.parse(), Ok(command));
         }
-    }
-
-    #[test]
-    fn test_context_requires_a_target() {
-        assert!(matches!(
-            "ctx".parse::<Command>(),
-            Err(CommandError::MissingArgument { command: "ctx", .. })
-        ));
     }
 
     #[test]

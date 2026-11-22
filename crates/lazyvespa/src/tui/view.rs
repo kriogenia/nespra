@@ -42,8 +42,10 @@ pub fn view(model: &Model, frame: &mut Frame) {
         _ => frame.render_widget(hints(), footer),
     }
 
-    if let Some(Overlay::Help) = model.overlay() {
-        help::render(&active_bindings(model), frame, frame.area());
+    match model.overlay() {
+        Some(Overlay::Help) => help::render(&active_bindings(model), frame, frame.area()),
+        Some(Overlay::TargetPicker(picker)) => picker.render(frame, main),
+        _ => {}
     }
 }
 
@@ -98,6 +100,19 @@ mod test {
             let message = crate::tui::palette::PaletteMsg::Insert(c);
             let _ = crate::tui::update(&mut model, crate::tui::Message::Palette(message));
         }
+        assert_snapshot!(render(&model).backend());
+    }
+
+    #[test]
+    fn test_view_with_target_picker() {
+        let config = Config::from_toml(
+            "[targets.local]\nendpoint = \"http://localhost:8080\"\n\
+             [targets.prod]\nendpoint = \"https://prod:443\"",
+        )
+        .unwrap();
+        let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
+        let mut model = Model::new(config, Some(target.unwrap()));
+        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenTargetPicker);
         assert_snapshot!(render(&model).backend());
     }
 

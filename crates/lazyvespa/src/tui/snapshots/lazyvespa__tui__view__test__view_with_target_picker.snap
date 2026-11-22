@@ -1,0 +1,12 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+" lazyvespa  local  self-hosted  http://localhost:8080                 "
+"┌────────────────────────────────────────────────────────────────────┐"
+"│                   ┌ Targets ───────────────────┐                   │"
+"│                   │> local ●                   │                   │"
+"│                   │  prod                      │                   │"
+"│                   └────────────────────────────┘                   │"
+"└────────────────────────────────────────────────────────────────────┘"
+" : command · T targets · ? help · q quit                              "

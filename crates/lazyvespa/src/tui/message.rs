@@ -1,6 +1,6 @@
 use crossterm::event::KeyEvent;
 
-use super::palette::PaletteMsg;
+use super::{palette::PaletteMsg, target_picker::PickerMsg};
 use crate::core::connection::ActiveTarget;
 
 /// Something that happened and the application reacts to.
@@ -14,6 +14,10 @@ pub enum Message {
     OpenPalette,
     /// Message of the command palette.
     Palette(PaletteMsg),
+    /// Open the list of targets.
+    OpenTargetPicker,
+    /// Message of the target picker.
+    Picker(PickerMsg),
     /// Connect to the configured target with this name.
     SwitchTarget(String),
     /// Result of connecting to a target. Boxed as it is much bigger than other messages.

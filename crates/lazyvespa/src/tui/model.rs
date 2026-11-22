@@ -1,4 +1,4 @@
-use super::palette::Palette;
+use super::{palette::Palette, target_picker::TargetPicker};
 use crate::core::{config::Config, connection::ActiveTarget};
 
 /// State of the whole application.
@@ -27,6 +27,8 @@ pub enum Overlay {
     Help,
     /// Command palette.
     Palette(Palette),
+    /// List of targets to connect to.
+    TargetPicker(TargetPicker),
 }
 
 /// Whether the application keeps running.
@@ -89,6 +91,21 @@ impl Model {
     /// Opens an empty command palette.
     pub(super) fn open_palette(&mut self) {
         self.overlay = Some(Overlay::Palette(Palette::default()));
+    }
+
+    /// Opens the list of the configured targets.
+    pub(super) fn open_target_picker(&mut self) {
+        let names = self.config.targets.keys().cloned().collect();
+        let current = self.target.as_ref().map(|active| active.name.as_str());
+        self.overlay = Some(Overlay::TargetPicker(TargetPicker::new(names, current)));
+    }
+
+    /// Target picker, if it is open.
+    pub(super) fn target_picker_mut(&mut self) -> Option<&mut TargetPicker> {
+        match &mut self.overlay {
+            Some(Overlay::TargetPicker(picker)) => Some(picker),
+            _ => None,
+        }
     }
 
     /// Command palette, if it is open.

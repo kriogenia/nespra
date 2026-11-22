@@ -5,7 +5,7 @@ use std::fmt;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::Message;
+use super::{Message, target_picker::PickerMsg};
 
 /// A key, optionally pressed together with modifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +59,8 @@ impl fmt::Display for Key {
             KeyCode::Char(c) => write!(f, "{c}"),
             KeyCode::Esc => f.write_str("Esc"),
             KeyCode::Enter => f.write_str("Enter"),
+            KeyCode::Up => f.write_str("↑"),
+            KeyCode::Down => f.write_str("↓"),
             code => write!(f, "{code}"),
         }
     }
@@ -83,6 +85,11 @@ pub const GLOBAL: &[Binding] = &[
         description: "command",
     },
     Binding {
+        keys: &[Key::char('T')],
+        message: Message::OpenTargetPicker,
+        description: "targets",
+    },
+    Binding {
         keys: &[Key::char('?')],
         message: Message::ToggleHelp,
         description: "help",
@@ -100,6 +107,25 @@ pub const OVERLAY: &[Binding] = &[Binding {
     message: Message::CloseOverlay,
     description: "close",
 }];
+
+/// Bindings of the target picker.
+pub const TARGET_PICKER: &[Binding] = &[
+    Binding {
+        keys: &[Key::char('j'), Key::new(KeyCode::Down)],
+        message: Message::Picker(PickerMsg::Next),
+        description: "next",
+    },
+    Binding {
+        keys: &[Key::char('k'), Key::new(KeyCode::Up)],
+        message: Message::Picker(PickerMsg::Previous),
+        description: "previous",
+    },
+    Binding {
+        keys: &[Key::new(KeyCode::Enter)],
+        message: Message::Picker(PickerMsg::Pick),
+        description: "connect",
+    },
+];
 
 /// Message bound to the key in the first group of bindings having it.
 pub fn message(groups: &[&[Binding]], event: &KeyEvent) -> Option<Message> {

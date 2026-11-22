@@ -2,13 +2,13 @@
 
 use ratatui::{
     Frame,
-    layout::{Constraint, Flex, Layout, Rect},
+    layout::Rect,
     style::Stylize,
     text::{Line, Span},
     widgets::{Block, Clear, Paragraph},
 };
 
-use super::keymap::Binding;
+use super::{keymap::Binding, popup::centered};
 
 /// Renders the bindings over the area, the most specific group first.
 pub(super) fn render(groups: &[&[Binding]], frame: &mut Frame, area: Rect) {
@@ -39,15 +39,4 @@ pub(super) fn render(groups: &[&[Binding]], frame: &mut Frame, area: Rect) {
         Paragraph::new(lines).block(Block::bordered().title(" Keys ")),
         popup,
     );
-}
-
-/// Area of the given size centered in another one, shrunk if it does not fit.
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let [area] = Layout::horizontal([Constraint::Length(width)])
-        .flex(Flex::Center)
-        .areas(area);
-    let [area] = Layout::vertical([Constraint::Length(height)])
-        .flex(Flex::Center)
-        .areas(area);
-    area
 }

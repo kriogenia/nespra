@@ -30,6 +30,14 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
                 Err(error) => model.set_notice(Notice::Error(error.to_string())),
             }
         }
+        Message::OpenTargetPicker => model.open_target_picker(),
+        Message::Picker(message) => {
+            let Some(name) = model.target_picker_mut().and_then(|p| p.update(message)) else {
+                return Vec::new();
+            };
+            model.close_overlay();
+            return update(model, Message::SwitchTarget(name));
+        }
         Message::SwitchTarget(name) => match model.config().target(&name) {
             Some(target) => {
                 let target = target.clone();
@@ -53,13 +61,17 @@ fn command_message(command: Command) -> Message {
     match command {
         Command::Help => Message::ToggleHelp,
         Command::Quit => Message::Quit,
-        Command::Context(name) => Message::SwitchTarget(name),
+        Command::Context(Some(name)) => Message::SwitchTarget(name),
+        Command::Context(None) => Message::OpenTargetPicker,
     }
 }
 
 /// Bindings active in the current state, the most specific first.
 pub(super) fn active_bindings(model: &Model) -> Vec<&'static [Binding]> {
     match model.overlay() {
+        Some(Overlay::TargetPicker(_)) => {
+            vec![keymap::TARGET_PICKER, keymap::OVERLAY, keymap::GLOBAL]
+        }
         Some(_) => vec![keymap::OVERLAY, keymap::GLOBAL],
         None => vec![keymap::GLOBAL],
     }
@@ -104,7 +116,11 @@ mod test {
     }
 
     fn config() -> Config {
-        Config::from_toml("[targets.local]\nendpoint = \"http://localhost:8080\"").unwrap()
+        Config::from_toml(
+            "[targets.local]\nendpoint = \"http://localhost:8080\"\n\
+             [targets.prod]\nendpoint = \"https://prod:443\"",
+        )
+        .unwrap()
     }
 
     #[test]
@@ -199,8 +215,29 @@ mod test {
     #[test]
     fn test_switch_to_an_unknown_target() {
         let mut model = Model::new(config(), None);
-        assert!(run_command(&mut model, "ctx prod").is_empty());
+        assert!(run_command(&mut model, "ctx staging").is_empty());
         assert!(matches!(model.notice(), Some(Notice::Error(_))));
+    }
+
+    #[test]
+    fn test_pick_a_target() {
+        let mut model = Model::new(config(), None);
+        let _ = press(&mut model, KeyCode::Char('T'));
+        assert!(matches!(model.overlay(), Some(Overlay::TargetPicker(_))));
+        let _ = press(&mut model, KeyCode::Char('j'));
+        let effects = press(&mut model, KeyCode::Enter);
+        assert_eq!(model.overlay(), None);
+        assert!(matches!(
+            effects.as_slice(),
+            [Effect::OpenTarget { name, .. }] if name == "prod"
+        ));
+    }
+
+    #[test]
+    fn test_ctx_without_name_opens_the_picker() {
+        let mut model = Model::new(config(), None);
+        assert!(run_command(&mut model, "ctx").is_empty());
+        assert!(matches!(model.overlay(), Some(Overlay::TargetPicker(_))));
     }
 
     #[test]
