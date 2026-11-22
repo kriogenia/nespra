@@ -29,21 +29,42 @@ pub enum Command {
     Help,
     /// Close the application.
     Quit,
+    /// Connect to the target with this name.
+    Context(String),
 }
 
-/// The typed text is not a command.
+/// The typed text is not a valid command.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("Unknown command {0:?}")]
-pub struct UnknownCommand(String);
+pub enum CommandError {
+    /// There is no command with this name.
+    #[error("Unknown command {0:?}")]
+    Unknown(String),
+    /// The command needs an argument.
+    #[error("{command} requires {argument}")]
+    MissingArgument {
+        /// Name of the command.
+        command: &'static str,
+        /// What is missing.
+        argument: &'static str,
+    },
+}
 
 impl FromStr for Command {
-    type Err = UnknownCommand;
+    type Err = CommandError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim() {
-            "help" | "h" | "?" => Ok(Command::Help),
-            "quit" | "q" | "q!" => Ok(Command::Quit),
-            other => Err(UnknownCommand(other.to_string())),
+        let mut words = s.split_whitespace();
+        let name = words.next().unwrap_or_default();
+        let argument = words.next();
+        match (name, argument) {
+            ("help" | "h" | "?", _) => Ok(Command::Help),
+            ("quit" | "q" | "q!", _) => Ok(Command::Quit),
+            ("ctx" | "context", Some(target)) => Ok(Command::Context(target.to_string())),
+            ("ctx" | "context", None) => Err(CommandError::MissingArgument {
+                command: "ctx",
+                argument: "the name of a target",
+            }),
+            _ => Err(CommandError::Unknown(s.trim().to_string())),
         }
     }
 }
@@ -56,7 +77,7 @@ impl Palette {
 
     /// Applies a message. Submitting returns the parsed command, `None` if nothing was
     /// typed.
-    pub fn update(&mut self, message: PaletteMsg) -> Option<Result<Command, UnknownCommand>> {
+    pub fn update(&mut self, message: PaletteMsg) -> Option<Result<Command, CommandError>> {
         match message {
             PaletteMsg::Insert(c) => self.input.push(c),
             PaletteMsg::DeleteBack => {
@@ -110,7 +131,7 @@ mod test {
     fn test_unknown_command() {
         assert_eq!(
             typed("deploy").update(PaletteMsg::Submit),
-            Some(Err(UnknownCommand("deploy".to_string())))
+            Some(Err(CommandError::Unknown("deploy".to_string())))
         );
     }
 
@@ -121,9 +142,19 @@ mod test {
             ("quit", Command::Quit),
             (" help ", Command::Help),
             ("?", Command::Help),
+            ("ctx prod", Command::Context("prod".to_string())),
+            ("  context   local ", Command::Context("local".to_string())),
         ] {
             assert_eq!(text.parse(), Ok(command));
         }
+    }
+
+    #[test]
+    fn test_context_requires_a_target() {
+        assert!(matches!(
+            "ctx".parse::<Command>(),
+            Err(CommandError::MissingArgument { command: "ctx", .. })
+        ));
     }
 
     #[test]

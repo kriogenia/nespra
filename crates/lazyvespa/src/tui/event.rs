@@ -1,32 +1,40 @@
-//! Translation of terminal events into [`Message`]s.
+//! Sources of [`Message`]s: the terminal and the results of the effects.
 
 use std::io;
 
 use crossterm::event::{Event, EventStream, KeyEventKind};
 use futures::StreamExt;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 use super::Message;
 
-/// Asynchronous source of the messages of the terminal.
+/// Asynchronous source of the messages.
 pub(super) struct Events {
     terminal: EventStream,
+    effects: UnboundedReceiver<Message>,
 }
 
 impl Events {
-    pub(super) fn new() -> Self {
+    /// Listens to the terminal and to the messages sent by the effects.
+    pub(super) fn new(effects: UnboundedReceiver<Message>) -> Self {
         Self {
             terminal: EventStream::new(),
+            effects,
         }
     }
 
-    /// Waits for the next terminal event and translates it, `None` when it is not relevant.
+    /// Waits for the next message, `None` when the event is not relevant.
     pub(super) async fn next(&mut self) -> io::Result<Option<Message>> {
-        match self.terminal.next().await {
-            Some(event) => Ok(message(event?)),
-            None => Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "the terminal event stream was closed",
-            )),
+        tokio::select! {
+            event = self.terminal.next() => match event {
+                Some(event) => Ok(message(event?)),
+                None => Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "the terminal event stream was closed",
+                )),
+            },
+            // The sender lives in the effect runner as long as the application runs
+            Some(message) = self.effects.recv() => Ok(Some(message)),
         }
     }
 }
@@ -48,14 +56,14 @@ mod test {
     #[test]
     fn test_key_presses() {
         let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
-        assert_eq!(message(Event::Key(key)), Some(Message::Key(key)));
+        assert!(matches!(message(Event::Key(key)), Some(Message::Key(k)) if k == key));
     }
 
     #[test]
     fn test_irrelevant_events() {
-        assert_eq!(message(Event::FocusGained), None);
+        assert!(message(Event::FocusGained).is_none());
         let mut release = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
         release.kind = KeyEventKind::Release;
-        assert_eq!(message(Event::Key(release)), None);
+        assert!(message(Event::Key(release)).is_none());
     }
 }

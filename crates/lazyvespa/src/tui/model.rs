@@ -1,13 +1,23 @@
 use super::palette::Palette;
-use crate::core::connection::ActiveTarget;
+use crate::core::{config::Config, connection::ActiveTarget};
 
 /// State of the whole application.
 #[derive(Debug, Default)]
 pub struct Model {
     running: RunningState,
+    config: Config,
     target: Option<ActiveTarget>,
     overlay: Option<Overlay>,
-    notice: Option<String>,
+    notice: Option<Notice>,
+}
+
+/// Message for the user about the last action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Notice {
+    /// Something went as expected.
+    Info(String),
+    /// Something failed.
+    Error(String),
 }
 
 /// Window shown on top of the rest.
@@ -28,12 +38,19 @@ enum RunningState {
 }
 
 impl Model {
-    /// Creates the model of an application connected to the target, if any.
-    pub fn new(target: Option<ActiveTarget>) -> Self {
+    /// Creates the model of an application with its configuration, connected to the
+    /// target, if any.
+    pub fn new(config: Config, target: Option<ActiveTarget>) -> Self {
         Model {
+            config,
             target,
             ..Model::default()
         }
+    }
+
+    /// Configuration of the application.
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     /// Target the application is connected to.
@@ -52,8 +69,13 @@ impl Model {
     }
 
     /// Message for the user about the last action, like an error.
-    pub fn notice(&self) -> Option<&str> {
-        self.notice.as_deref()
+    pub fn notice(&self) -> Option<&Notice> {
+        self.notice.as_ref()
+    }
+
+    /// Replaces the target the application is connected to.
+    pub(super) fn set_target(&mut self, target: ActiveTarget) {
+        self.target = Some(target);
     }
 
     /// Opens the help, or closes it if it is already open.
@@ -83,8 +105,8 @@ impl Model {
     }
 
     /// Shows a message to the user, replacing the previous one.
-    pub(super) fn set_notice(&mut self, notice: impl Into<String>) {
-        self.notice = Some(notice.into());
+    pub(super) fn set_notice(&mut self, notice: Notice) {
+        self.notice = Some(notice);
     }
 
     /// Hides the message shown to the user.

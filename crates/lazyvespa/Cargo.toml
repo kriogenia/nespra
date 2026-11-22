@@ -20,7 +20,7 @@ nespra = { path = "../client", features = ["admin"] }
 ratatui = "0.30.2"
 serde.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 toml = "1.2.1"
 
 [dev-dependencies]

@@ -126,32 +126,24 @@ mod test {
             (KeyCode::Char('?'), KeyModifiers::NONE, Message::ToggleHelp),
             (KeyCode::Char('?'), KeyModifiers::SHIFT, Message::ToggleHelp),
         ] {
-            assert_eq!(
-                message_for(&[GLOBAL], press(code, modifiers)),
-                Some(message)
-            );
+            let found = message_for(&[GLOBAL], press(code, modifiers));
+            assert_eq!(format!("{found:?}"), format!("{:?}", Some(message)));
         }
     }
 
     #[test]
     fn test_unbound_keys() {
-        assert_eq!(
-            message_for(&[GLOBAL], press(KeyCode::Char('c'), KeyModifiers::NONE)),
-            None
-        );
-        assert_eq!(
-            message_for(&[GLOBAL], press(KeyCode::Esc, KeyModifiers::NONE)),
-            None
-        );
+        assert!(message_for(&[GLOBAL], press(KeyCode::Char('c'), KeyModifiers::NONE)).is_none());
+        assert!(message_for(&[GLOBAL], press(KeyCode::Esc, KeyModifiers::NONE)).is_none());
     }
 
     #[test]
     fn test_first_group_wins() {
         let esc = press(KeyCode::Esc, KeyModifiers::NONE);
-        assert_eq!(
+        assert!(matches!(
             message_for(&[OVERLAY, GLOBAL], esc),
             Some(Message::CloseOverlay)
-        );
+        ));
     }
 
     #[test]

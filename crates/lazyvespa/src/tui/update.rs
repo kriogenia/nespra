@@ -1,36 +1,51 @@
 use crossterm::event::KeyEvent;
 
 use super::{
-    Message, Model,
+    Effect, Message, Model,
     keymap::{self, Binding},
-    model::Overlay,
+    model::{Notice, Overlay},
     palette::{self, Command},
 };
 
-/// Applies a message to the model. It is the only place where the state changes.
-pub fn update(model: &mut Model, message: Message) {
+/// Applies a message to the model. It is the only place where the state changes, and it
+/// does not run side effects: it returns them to be run by the caller.
+#[must_use = "the effects must be run"]
+pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
     match message {
         Message::Key(key) => {
             model.clear_notice();
             if let Some(message) = key_message(model, &key) {
-                update(model, message);
+                return update(model, message);
             }
         }
         Message::ToggleHelp => model.toggle_help(),
         Message::OpenPalette => model.open_palette(),
         Message::Palette(message) => {
             let Some(result) = model.palette_mut().and_then(|p| p.update(message)) else {
-                return;
+                return Vec::new();
             };
             model.close_overlay();
             match result {
-                Ok(command) => update(model, command_message(command)),
-                Err(error) => model.set_notice(error.to_string()),
+                Ok(command) => return update(model, command_message(command)),
+                Err(error) => model.set_notice(Notice::Error(error.to_string())),
             }
         }
+        Message::SwitchTarget(name) => match model.config().target(&name) {
+            Some(target) => {
+                let target = target.clone();
+                return vec![Effect::OpenTarget { name, target }];
+            }
+            None => model.set_notice(Notice::Error(format!("There is no target named {name:?}"))),
+        },
+        Message::TargetOpened(Ok(target)) => {
+            model.set_notice(Notice::Info(format!("Connected to {}", target.name)));
+            model.set_target(*target);
+        }
+        Message::TargetOpened(Err(error)) => model.set_notice(Notice::Error(error)),
         Message::CloseOverlay => model.close_overlay(),
         Message::Quit => model.quit(),
     }
+    Vec::new()
 }
 
 /// Message running the command of the palette.
@@ -38,6 +53,7 @@ fn command_message(command: Command) -> Message {
     match command {
         Command::Help => Message::ToggleHelp,
         Command::Quit => Message::Quit,
+        Command::Context(name) => Message::SwitchTarget(name),
     }
 }
 
@@ -66,46 +82,62 @@ mod test {
     use crossterm::event::{KeyCode, KeyModifiers};
 
     use super::*;
+    use crate::core::{
+        config::{Config, Target},
+        connection::ActiveTarget,
+    };
 
-    fn press(model: &mut Model, code: KeyCode) {
-        update(model, Message::Key(KeyEvent::new(code, KeyModifiers::NONE)));
+    fn press(model: &mut Model, code: KeyCode) -> Vec<Effect> {
+        update(model, Message::Key(KeyEvent::new(code, KeyModifiers::NONE)))
     }
 
-    fn type_text(model: &mut Model, text: &str) {
-        text.chars().for_each(|c| press(model, KeyCode::Char(c)));
+    fn type_text(model: &mut Model, text: &str) -> Vec<Effect> {
+        text.chars()
+            .flat_map(|c| press(model, KeyCode::Char(c)))
+            .collect()
+    }
+
+    fn run_command(model: &mut Model, command: &str) -> Vec<Effect> {
+        let mut effects = type_text(model, &format!(":{command}"));
+        effects.extend(press(model, KeyCode::Enter));
+        effects
+    }
+
+    fn config() -> Config {
+        Config::from_toml("[targets.local]\nendpoint = \"http://localhost:8080\"").unwrap()
     }
 
     #[test]
     fn test_quit() {
         let mut model = Model::default();
         assert!(model.is_running());
-        update(&mut model, Message::Quit);
+        assert!(update(&mut model, Message::Quit).is_empty());
         assert!(!model.is_running());
     }
 
     #[test]
     fn test_keys_trigger_their_message() {
         let mut model = Model::default();
-        press(&mut model, KeyCode::Char('q'));
+        let _ = press(&mut model, KeyCode::Char('q'));
         assert!(!model.is_running());
     }
 
     #[test]
     fn test_toggle_help() {
         let mut model = Model::default();
-        press(&mut model, KeyCode::Char('?'));
+        let _ = press(&mut model, KeyCode::Char('?'));
         assert_eq!(model.overlay(), Some(&Overlay::Help));
-        press(&mut model, KeyCode::Char('?'));
+        let _ = press(&mut model, KeyCode::Char('?'));
         assert_eq!(model.overlay(), None);
     }
 
     #[test]
     fn test_escape_closes_the_help() {
         let mut model = Model::default();
-        press(&mut model, KeyCode::Esc);
+        let _ = press(&mut model, KeyCode::Esc);
         assert_eq!(model.overlay(), None);
-        press(&mut model, KeyCode::Char('?'));
-        press(&mut model, KeyCode::Esc);
+        let _ = press(&mut model, KeyCode::Char('?'));
+        let _ = press(&mut model, KeyCode::Esc);
         assert_eq!(model.overlay(), None);
         assert!(model.is_running());
     }
@@ -113,7 +145,7 @@ mod test {
     #[test]
     fn test_keys_are_text_in_the_palette() {
         let mut model = Model::default();
-        type_text(&mut model, ":q?");
+        let _ = type_text(&mut model, ":q?");
         let Some(Overlay::Palette(palette)) = model.overlay() else {
             panic!("the palette must be open");
         };
@@ -124,28 +156,75 @@ mod test {
     #[test]
     fn test_run_a_command() {
         let mut model = Model::default();
-        type_text(&mut model, ":quit");
-        press(&mut model, KeyCode::Enter);
+        let _ = run_command(&mut model, "quit");
         assert!(!model.is_running());
     }
 
     #[test]
-    fn test_unknown_command_is_noticed_until_the_next_key() {
+    fn test_invalid_command_is_noticed_until_the_next_key() {
         let mut model = Model::default();
-        type_text(&mut model, ":nope");
-        press(&mut model, KeyCode::Enter);
+        let _ = run_command(&mut model, "nope");
         assert_eq!(model.overlay(), None);
-        assert_eq!(model.notice(), Some("Unknown command \"nope\""));
-        press(&mut model, KeyCode::Char('x'));
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Error("Unknown command \"nope\"".to_string()))
+        );
+        let _ = press(&mut model, KeyCode::Char('x'));
         assert_eq!(model.notice(), None);
     }
 
     #[test]
     fn test_escape_closes_the_palette() {
         let mut model = Model::default();
-        type_text(&mut model, ":qui");
-        press(&mut model, KeyCode::Esc);
+        let _ = type_text(&mut model, ":qui");
+        let _ = press(&mut model, KeyCode::Esc);
         assert_eq!(model.overlay(), None);
         assert!(model.is_running());
+    }
+
+    #[test]
+    fn test_switch_to_a_target_opens_it() {
+        let mut model = Model::new(config(), None);
+        let effects = run_command(&mut model, "ctx local");
+        assert_eq!(
+            effects,
+            vec![Effect::OpenTarget {
+                name: "local".to_string(),
+                target: Target::self_hosted("http://localhost:8080"),
+            }]
+        );
+        assert!(model.target().is_none(), "connected only once it is opened");
+    }
+
+    #[test]
+    fn test_switch_to_an_unknown_target() {
+        let mut model = Model::new(config(), None);
+        assert!(run_command(&mut model, "ctx prod").is_empty());
+        assert!(matches!(model.notice(), Some(Notice::Error(_))));
+    }
+
+    #[test]
+    fn test_target_opened() {
+        let mut model = Model::new(config(), None);
+        let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
+        let target = Box::new(target.unwrap());
+        let _ = update(&mut model, Message::TargetOpened(Ok(target)));
+        assert_eq!(model.target().unwrap().name, "local");
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info("Connected to local".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_target_failed_to_open_keeps_the_current_one() {
+        let current = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
+        let mut model = Model::new(config(), Some(current.unwrap()));
+        let _ = update(
+            &mut model,
+            Message::TargetOpened(Err("no cert".to_string())),
+        );
+        assert_eq!(model.target().unwrap().name, "local");
+        assert_eq!(model.notice(), Some(&Notice::Error("no cert".to_string())));
     }
 }

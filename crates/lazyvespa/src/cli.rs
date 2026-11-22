@@ -27,22 +27,23 @@ pub struct Cli {
 }
 
 impl Cli {
-    /// Opens the requested target, `None` when no target is requested nor configured
-    /// by default.
-    pub fn open_target(&self) -> Result<Option<ActiveTarget>> {
+    /// Loads the configuration and opens the requested target, `None` when no target is
+    /// requested nor configured by default.
+    pub fn load(&self) -> Result<(Config, Option<ActiveTarget>)> {
+        let config = self.load_config()?;
         let selected = match &self.url {
             Some(url) => Some(("url".to_string(), Target::self_hosted(url))),
-            None => self
-                .load_config()?
+            None => config
                 .select(self.target.as_deref())?
                 .map(|(name, target)| (name.to_string(), target.clone())),
         };
-        selected
+        let target = selected
             .map(|(name, target)| {
                 ActiveTarget::open(&name, target)
                     .wrap_err_with(|| format!("Unable to connect to the target {name:?}"))
             })
-            .transpose()
+            .transpose()?;
+        Ok((config, target))
     }
 
     /// Loads the requested configuration file, or the default one if it exists.
@@ -76,7 +77,8 @@ mod test {
     #[test]
     fn test_url_target() {
         let cli = Cli::try_parse_from(["lazyvespa", "--url", "http://localhost:8080"]).unwrap();
-        let active = cli.open_target().unwrap().unwrap();
+        let (_, active) = cli.load().unwrap();
+        let active = active.unwrap();
         assert_eq!(active.name, "url");
         assert_eq!(active.target, Target::self_hosted("http://localhost:8080"));
     }
@@ -84,6 +86,6 @@ mod test {
     #[test]
     fn test_missing_config_file() {
         let cli = Cli::try_parse_from(["lazyvespa", "--config", "/does/not/exist.toml"]).unwrap();
-        assert!(cli.open_target().is_err());
+        assert!(cli.load().is_err());
     }
 }

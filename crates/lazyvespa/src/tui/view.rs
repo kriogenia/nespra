@@ -6,7 +6,12 @@ use ratatui::{
     widgets::Block,
 };
 
-use super::{Model, help, keymap, model::Overlay, status_bar, update::active_bindings};
+use super::{
+    Model, help, keymap,
+    model::{Notice, Overlay},
+    status_bar,
+    update::active_bindings,
+};
 
 /// Renders the model. It only reads the state, never changes it.
 pub fn view(model: &Model, frame: &mut Frame) {
@@ -28,7 +33,12 @@ pub fn view(model: &Model, frame: &mut Frame) {
             frame.render_widget(Line::from(line), footer);
             frame.set_cursor_position((cursor_x.min(footer.right().saturating_sub(1)), footer.y));
         }
-        (_, Some(notice)) => frame.render_widget(Line::from(format!(" {notice}")).red(), footer),
+        (_, Some(Notice::Info(text))) => {
+            frame.render_widget(Line::from(format!(" {text}")).green(), footer)
+        }
+        (_, Some(Notice::Error(text))) => {
+            frame.render_widget(Line::from(format!(" {text}")).red(), footer)
+        }
         _ => frame.render_widget(hints(), footer),
     }
 
@@ -58,7 +68,7 @@ mod test {
     use super::*;
 
     use crate::core::{
-        config::{CloudApplication, Target},
+        config::{CloudApplication, Config, Target},
         connection::ActiveTarget,
     };
 
@@ -76,17 +86,17 @@ mod test {
     #[test]
     fn test_view_with_help() {
         let mut model = Model::default();
-        crate::tui::update(&mut model, crate::tui::Message::ToggleHelp);
+        let _ = crate::tui::update(&mut model, crate::tui::Message::ToggleHelp);
         assert_snapshot!(render(&model).backend());
     }
 
     #[test]
     fn test_view_with_palette() {
         let mut model = Model::default();
-        crate::tui::update(&mut model, crate::tui::Message::OpenPalette);
+        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenPalette);
         for c in "ctx".chars() {
             let message = crate::tui::palette::PaletteMsg::Insert(c);
-            crate::tui::update(&mut model, crate::tui::Message::Palette(message));
+            let _ = crate::tui::update(&mut model, crate::tui::Message::Palette(message));
         }
         assert_snapshot!(render(&model).backend());
     }
@@ -94,7 +104,7 @@ mod test {
     #[test]
     fn test_view_with_target() {
         let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
-        let model = Model::new(Some(target.unwrap()));
+        let model = Model::new(Config::default(), Some(target.unwrap()));
         assert_snapshot!(render(&model).backend());
     }
 
@@ -106,7 +116,10 @@ mod test {
             application: "search".to_string(),
             instance: "default".to_string(),
         });
-        let model = Model::new(Some(ActiveTarget::open("prod", target).unwrap()));
+        let model = Model::new(
+            Config::default(),
+            Some(ActiveTarget::open("prod", target).unwrap()),
+        );
         assert_snapshot!(render(&model).backend());
     }
 }

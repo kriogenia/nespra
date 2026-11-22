@@ -9,10 +9,10 @@ use crate::cli::Cli;
 #[tokio::main]
 async fn main() -> Result<()> {
     install_error_hooks()?;
-    let target = Cli::parse().open_target()?;
+    let (config, target) = Cli::parse().load()?;
 
     let mut terminal = ratatui::init();
-    let result = tui::run(&mut terminal, Model::new(target)).await;
+    let result = tui::run(&mut terminal, Model::new(config, target)).await;
     ratatui::restore();
     Ok(result?)
 }
