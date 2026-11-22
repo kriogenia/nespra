@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Paragraph},
 };
 
-use super::Model;
+use super::{Model, help, keymap, model::Overlay, update::active_bindings};
 
 /// Renders the model. It only reads the state, never changes it.
 pub fn view(model: &Model, frame: &mut Frame) {
@@ -22,7 +22,24 @@ pub fn view(model: &Model, frame: &mut Frame) {
         .alignment(Alignment::Center)
         .block(Block::bordered().title_top(target.right_aligned()));
     frame.render_widget(title, main);
-    frame.render_widget(Line::from(" q quit").dim(), footer);
+    frame.render_widget(hints(), footer);
+
+    if model.overlay() == Some(Overlay::Help) {
+        help::render(&active_bindings(model), frame, frame.area());
+    }
+}
+
+/// Suggested key of each global binding.
+fn hints() -> Line<'static> {
+    let hints = keymap::GLOBAL
+        .iter()
+        .filter_map(|binding| {
+            let key = binding.keys.first()?;
+            Some(format!("{key} {}", binding.description))
+        })
+        .collect::<Vec<_>>()
+        .join(" · ");
+    Line::from(format!(" {hints}")).dim()
 }
 
 #[cfg(test)]
@@ -35,7 +52,7 @@ mod test {
     use crate::core::{config::Target, connection::ActiveTarget};
 
     fn render(model: &Model) -> Terminal<TestBackend> {
-        let mut terminal = Terminal::new(TestBackend::new(50, 6)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(50, 8)).unwrap();
         terminal.draw(|frame| view(model, frame)).unwrap();
         terminal
     }
@@ -43,6 +60,13 @@ mod test {
     #[test]
     fn test_view_without_target() {
         assert_snapshot!(render(&Model::default()).backend());
+    }
+
+    #[test]
+    fn test_view_with_help() {
+        let mut model = Model::default();
+        crate::tui::update(&mut model, crate::tui::Message::ToggleHelp);
+        assert_snapshot!(render(&model).backend());
     }
 
     #[test]

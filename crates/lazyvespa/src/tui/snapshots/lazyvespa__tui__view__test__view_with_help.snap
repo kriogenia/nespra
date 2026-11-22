@@ -1,0 +1,12 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+"┌───────────────────────────────────── no target ┐"
+"│                    lazyvespa                   │"
+"│      ┌ Keys ────────────────────────────┐      │"
+"│      │       Esc  close                 │      │"
+"│      │         ?  help                  │      │"
+"│      │ q, Ctrl+C  quit                  │      │"
+"└──────└──────────────────────────────────┘──────┘"
+" ? help · q quit                                  "

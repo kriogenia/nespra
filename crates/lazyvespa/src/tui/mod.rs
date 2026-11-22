@@ -1,6 +1,8 @@
 //! Terminal UI following The Elm Architecture.
 
 mod event;
+mod help;
+mod keymap;
 mod message;
 mod model;
 mod update;

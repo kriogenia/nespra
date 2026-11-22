@@ -5,6 +5,14 @@ use crate::core::connection::ActiveTarget;
 pub struct Model {
     running: RunningState,
     target: Option<ActiveTarget>,
+    overlay: Option<Overlay>,
+}
+
+/// Window shown on top of the rest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Overlay {
+    /// Key bindings.
+    Help,
 }
 
 /// Whether the application keeps running.
@@ -32,6 +40,21 @@ impl Model {
     /// Whether the application keeps running.
     pub fn is_running(&self) -> bool {
         self.running == RunningState::Running
+    }
+
+    /// Overlay currently open.
+    pub fn overlay(&self) -> Option<Overlay> {
+        self.overlay
+    }
+
+    /// Opens the overlay, or closes it if it is already open.
+    pub(super) fn toggle_overlay(&mut self, overlay: Overlay) {
+        self.overlay = (self.overlay != Some(overlay)).then_some(overlay);
+    }
+
+    /// Closes the open overlay.
+    pub(super) fn close_overlay(&mut self) {
+        self.overlay = None;
     }
 
     /// Stops the application.

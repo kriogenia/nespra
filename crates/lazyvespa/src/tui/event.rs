@@ -2,7 +2,7 @@
 
 use std::io;
 
-use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event, EventStream, KeyEventKind};
 use futures::StreamExt;
 
 use super::Message;
@@ -34,43 +34,25 @@ impl Events {
 /// Message triggered by a terminal event, if any.
 fn message(event: Event) -> Option<Message> {
     match event {
-        Event::Key(key) if key.kind == KeyEventKind::Press => key_message(key),
-        _ => None,
-    }
-}
-
-fn key_message(key: KeyEvent) -> Option<Message> {
-    match (key.code, key.modifiers) {
-        (KeyCode::Char('q'), _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-            Some(Message::Quit)
-        }
+        Event::Key(key) if key.kind == KeyEventKind::Press => Some(Message::Key(key)),
         _ => None,
     }
 }
 
 #[cfg(test)]
 mod test {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
     use super::*;
 
-    fn press(code: KeyCode, modifiers: KeyModifiers) -> Event {
-        Event::Key(KeyEvent::new(code, modifiers))
-    }
-
     #[test]
-    fn test_quit_keys() {
-        assert_eq!(
-            message(press(KeyCode::Char('q'), KeyModifiers::NONE)),
-            Some(Message::Quit)
-        );
-        assert_eq!(
-            message(press(KeyCode::Char('c'), KeyModifiers::CONTROL)),
-            Some(Message::Quit)
-        );
+    fn test_key_presses() {
+        let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
+        assert_eq!(message(Event::Key(key)), Some(Message::Key(key)));
     }
 
     #[test]
     fn test_irrelevant_events() {
-        assert_eq!(message(press(KeyCode::Char('c'), KeyModifiers::NONE)), None);
         assert_eq!(message(Event::FocusGained), None);
         let mut release = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
         release.kind = KeyEventKind::Release;
