@@ -1,0 +1,19 @@
+[package]
+name = "lazyvespa"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Terminal UI to query and operate Vespa deployments"
+repository.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["vespa", "search", "tui", "terminal"]
+categories = ["command-line-utilities"]
+publish = false
+
+[dependencies]
+color-eyre = "0.6.5"
+ratatui = "0.30.2"
+
+[dev-dependencies]
+insta = "1.49.0"

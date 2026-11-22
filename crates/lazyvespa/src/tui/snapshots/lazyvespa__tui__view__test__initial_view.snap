@@ -1,0 +1,10 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: terminal.backend()
+---
+"┌──────────────────────────────────────┐"
+"│               lazyvespa              │"
+"│                                      │"
+"│                                      │"
+"└──────────────────────────────────────┘"
+" q quit                                 "

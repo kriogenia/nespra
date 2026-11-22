@@ -15,3 +15,8 @@ release = false
 
 [[package]]
 name = "nespra_admin"
+
+# Not released until it has its first usable version
+[[package]]
+name = "lazyvespa"
+release = false
