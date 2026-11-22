@@ -10,6 +10,7 @@ mod palette;
 mod params_form;
 mod popup;
 mod query_editor;
+mod results;
 mod status_bar;
 mod target_picker;
 mod update;

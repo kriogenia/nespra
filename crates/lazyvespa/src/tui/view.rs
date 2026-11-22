@@ -9,7 +9,7 @@ use super::{
     Model, help,
     keymap::Binding,
     model::{Notice, Overlay},
-    status_bar,
+    results, status_bar,
     update::active_bindings,
 };
 
@@ -23,9 +23,10 @@ pub fn view(model: &Model, frame: &mut Frame) {
     .areas(frame.area());
 
     status_bar::render(model.target(), frame, header);
-    let [editor, _results] =
+    let [editor, results] =
         Layout::vertical([Constraint::Length(8), Constraint::Fill(1)]).areas(main);
     model.editor().render(frame, editor);
+    results::render(model.search(), frame, results);
     match (model.overlay(), model.notice()) {
         (Some(Overlay::Palette(palette)), _) => {
             let line = format!(":{}", palette.input());
