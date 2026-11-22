@@ -5,7 +5,7 @@ use std::fmt;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{Message, query_editor::EditorMsg, target_picker::PickerMsg};
+use super::{Message, params_form::ParamsMsg, query_editor::EditorMsg, target_picker::PickerMsg};
 
 /// A key, optionally pressed together with modifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +59,7 @@ impl fmt::Display for Key {
             KeyCode::Char(c) => write!(f, "{c}"),
             KeyCode::Esc => f.write_str("Esc"),
             KeyCode::Enter => f.write_str("Enter"),
+            KeyCode::Tab => f.write_str("Tab"),
             KeyCode::Up => f.write_str("↑"),
             KeyCode::Down => f.write_str("↓"),
             code => write!(f, "{code}"),
@@ -108,11 +109,59 @@ pub const OVERLAY: &[Binding] = &[Binding {
     description: "close",
 }];
 
-/// Bindings of the query editor out of the edit mode.
-pub const EDITOR: &[Binding] = &[Binding {
-    keys: &[Key::char('i'), Key::new(KeyCode::Enter)],
-    message: Message::Editor(EditorMsg::StartEditing),
-    description: "edit query",
+/// Bindings of the YQL out of the edit mode.
+pub const EDITOR_YQL: &[Binding] = &[
+    Binding {
+        keys: &[Key::char('i'), Key::new(KeyCode::Enter)],
+        message: Message::Editor(EditorMsg::StartEditing),
+        description: "edit",
+    },
+    Binding {
+        keys: &[Key::new(KeyCode::Tab)],
+        message: Message::Editor(EditorMsg::SwitchFocus),
+        description: "parameters",
+    },
+];
+
+/// Bindings of the parameters out of the edit mode.
+pub const EDITOR_PARAMS: &[Binding] = &[
+    Binding {
+        keys: &[Key::char('i'), Key::new(KeyCode::Enter)],
+        message: Message::Editor(EditorMsg::StartEditing),
+        description: "edit",
+    },
+    Binding {
+        keys: &[Key::char('a')],
+        message: Message::Editor(EditorMsg::AddParam),
+        description: "add",
+    },
+    Binding {
+        keys: &[Key::char('d')],
+        message: Message::Editor(EditorMsg::Params(ParamsMsg::Delete)),
+        description: "delete",
+    },
+    Binding {
+        keys: &[Key::char('j'), Key::new(KeyCode::Down)],
+        message: Message::Editor(EditorMsg::Params(ParamsMsg::Next)),
+        description: "next",
+    },
+    Binding {
+        keys: &[Key::char('k'), Key::new(KeyCode::Up)],
+        message: Message::Editor(EditorMsg::Params(ParamsMsg::Previous)),
+        description: "previous",
+    },
+    Binding {
+        keys: &[Key::new(KeyCode::Tab)],
+        message: Message::Editor(EditorMsg::SwitchFocus),
+        description: "query",
+    },
+];
+
+/// Bindings while typing a parameter, on top of the ones of the edit mode.
+pub const EDITING_PARAM: &[Binding] = &[Binding {
+    keys: &[Key::new(KeyCode::Tab)],
+    message: Message::Editor(EditorMsg::Params(ParamsMsg::SwitchField)),
+    description: "name/value",
 }];
 
 /// Bindings while typing in the query editor. Any other key is text.

@@ -5,7 +5,7 @@ use super::{
     keymap::{self, Binding},
     model::{Notice, Overlay},
     palette::{self, Command},
-    query_editor::EditorMsg,
+    query_editor::{EditorMsg, Focus},
 };
 
 /// Applies a message to the model. It is the only place where the state changes, and it
@@ -75,8 +75,15 @@ pub(super) fn active_bindings(model: &Model) -> Vec<&'static [Binding]> {
             vec![keymap::TARGET_PICKER, keymap::OVERLAY, keymap::GLOBAL]
         }
         Some(_) => vec![keymap::OVERLAY, keymap::GLOBAL],
-        None if model.editor().is_editing() => vec![keymap::EDITING],
-        None => vec![keymap::EDITOR, keymap::GLOBAL],
+        None => {
+            let editor = model.editor();
+            match (editor.focus(), editor.is_editing()) {
+                (Focus::Yql, true) => vec![keymap::EDITING],
+                (Focus::Params, true) => vec![keymap::EDITING_PARAM, keymap::EDITING],
+                (Focus::Yql, false) => vec![keymap::EDITOR_YQL, keymap::GLOBAL],
+                (Focus::Params, false) => vec![keymap::EDITOR_PARAMS, keymap::GLOBAL],
+            }
+        }
     }
 }
 
@@ -87,7 +94,7 @@ fn key_message(model: &Model, key: &KeyEvent) -> Option<Message> {
         Some(Overlay::Palette(_)) => keymap::message(&[keymap::OVERLAY], key)
             .or_else(|| palette::key_message(key).map(Message::Palette))
             .or_else(|| keymap::message(&[keymap::GLOBAL], key)),
-        None if model.editor().is_editing() => keymap::message(&[keymap::EDITING], key)
+        None if model.editor().is_editing() => keymap::message(&active_bindings(model), key)
             .or(Some(Message::Editor(EditorMsg::Input(*key)))),
         _ => keymap::message(&active_bindings(model), key),
     }
@@ -262,6 +269,24 @@ mod test {
         // and shortcuts again after editing
         let _ = press(&mut model, KeyCode::Char('q'));
         assert!(!model.is_running());
+    }
+
+    #[test]
+    fn test_edit_a_param() {
+        let mut model = Model::default();
+        let _ = press(&mut model, KeyCode::Tab);
+        let _ = type_text(&mut model, "j");
+        let _ = press(&mut model, KeyCode::Enter);
+        let _ = type_text(&mut model, "7");
+        let _ = press(&mut model, KeyCode::Esc);
+        let _ = type_text(&mut model, "a");
+        let _ = type_text(&mut model, "offset");
+        let _ = press(&mut model, KeyCode::Tab);
+        let _ = type_text(&mut model, "2");
+        let _ = press(&mut model, KeyCode::Esc);
+        let request = model.editor().draft().request().unwrap();
+        assert_eq!((request.hits, request.offset), (Some(7), Some(2)));
+        assert!(model.is_running());
     }
 
     #[test]

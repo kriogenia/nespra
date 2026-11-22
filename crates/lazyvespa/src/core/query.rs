@@ -41,7 +41,7 @@ impl QueryDraft {
     ///
     /// `hits`, `offset` and `timeout` go to their typed fields. The other parameters are sent as
     /// written, except values that look like booleans or numbers, sent as such. Parameters
-    /// with a blank name and value are skipped.
+    /// without value are not set, so they are skipped.
     ///
     /// # Errors
     ///
@@ -58,7 +58,7 @@ impl QueryDraft {
         for (name, value) in &self.params {
             let (name, value) = (name.trim(), value.trim());
             match (name, value) {
-                ("", "") => continue,
+                (_, "") => continue,
                 ("", value) => return Err(QueryError::MissingName(value.to_string())),
                 ("yql", _) => return Err(QueryError::YqlParam),
                 (name, _) if !seen.insert(name) => {
@@ -173,8 +173,11 @@ mod test {
     }
 
     #[test]
-    fn test_blank_params_are_skipped() {
-        let draft = QueryDraft::new("select * from doc where true").param(" ", "");
+    fn test_params_without_value_are_skipped() {
+        let draft = QueryDraft::new("select * from doc where true")
+            .param(" ", "")
+            .param("hits", " ")
+            .param("hits", "");
         assert_eq!(body(&draft), json!({"yql": "select * from doc where true"}));
     }
 

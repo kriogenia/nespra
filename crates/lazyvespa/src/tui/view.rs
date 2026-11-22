@@ -67,10 +67,12 @@ fn hints(groups: &[&[Binding]]) -> Line<'static> {
 
 #[cfg(test)]
 mod test {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use insta::assert_snapshot;
     use ratatui::{Terminal, backend::TestBackend};
 
     use super::*;
+    use crate::tui::{params_form::ParamsMsg, query_editor::EditorMsg};
 
     use crate::core::{
         config::{CloudApplication, Config, Target},
@@ -78,7 +80,7 @@ mod test {
     };
 
     fn render(model: &Model) -> Terminal<TestBackend> {
-        let mut terminal = Terminal::new(TestBackend::new(70, 12)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(90, 12)).unwrap();
         terminal.draw(|frame| view(model, frame)).unwrap();
         terminal
     }
@@ -124,8 +126,22 @@ mod test {
         let mut model = Model::default();
         let _ = crate::tui::update(
             &mut model,
-            crate::tui::Message::Editor(crate::tui::query_editor::EditorMsg::StartEditing),
+            crate::tui::Message::Editor(EditorMsg::StartEditing),
         );
+        assert_snapshot!(render(&model).backend());
+    }
+
+    #[test]
+    fn test_view_while_editing_a_param() {
+        let mut model = Model::default();
+        for message in [
+            EditorMsg::SwitchFocus,
+            EditorMsg::Params(ParamsMsg::Next),
+            EditorMsg::StartEditing,
+            EditorMsg::Input(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::NONE)),
+        ] {
+            let _ = crate::tui::update(&mut model, crate::tui::Message::Editor(message));
+        }
         assert_snapshot!(render(&model).backend());
     }
 

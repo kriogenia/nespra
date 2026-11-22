@@ -7,6 +7,7 @@ mod keymap;
 mod message;
 mod model;
 mod palette;
+mod params_form;
 mod popup;
 mod query_editor;
 mod status_bar;
