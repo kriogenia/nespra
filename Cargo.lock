@@ -446,6 +446,7 @@ dependencies = [
  "crossterm_winapi",
  "derive_more",
  "document-features",
+ "futures-core",
  "mio",
  "parking_lot",
  "rustix",
@@ -1338,8 +1339,11 @@ name = "lazyvespa"
 version = "0.1.0"
 dependencies = [
  "color-eyre",
+ "crossterm",
+ "futures",
  "insta",
  "ratatui",
+ "tokio",
 ]
 
 [[package]]

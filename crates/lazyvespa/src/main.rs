@@ -1,7 +1,10 @@
 use color_eyre::Result;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     color_eyre::install()?;
-    ratatui::run(lazyvespa::tui::run)?;
-    Ok(())
+    let mut terminal = ratatui::init();
+    let result = lazyvespa::tui::run(&mut terminal).await;
+    ratatui::restore();
+    Ok(result?)
 }

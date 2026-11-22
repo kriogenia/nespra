@@ -20,11 +20,12 @@ pub use view::view;
 /// # Errors
 ///
 /// Fails if the terminal cannot be drawn or its events cannot be read.
-pub fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
+pub async fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
     let mut model = Model::default();
+    let mut events = event::Events::new();
     while model.is_running() {
         terminal.draw(|frame| view(&model, frame))?;
-        if let Some(message) = event::next()? {
+        if let Some(message) = events.next().await? {
             update(&mut model, message);
         }
     }

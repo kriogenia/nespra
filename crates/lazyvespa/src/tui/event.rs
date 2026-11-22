@@ -2,13 +2,33 @@
 
 use std::io;
 
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use futures::StreamExt;
 
 use super::Message;
 
-/// Waits for the next terminal event and translates it, `None` when it is not relevant.
-pub(super) fn next() -> io::Result<Option<Message>> {
-    Ok(message(event::read()?))
+/// Asynchronous source of the messages of the terminal.
+pub(super) struct Events {
+    terminal: EventStream,
+}
+
+impl Events {
+    pub(super) fn new() -> Self {
+        Self {
+            terminal: EventStream::new(),
+        }
+    }
+
+    /// Waits for the next terminal event and translates it, `None` when it is not relevant.
+    pub(super) async fn next(&mut self) -> io::Result<Option<Message>> {
+        match self.terminal.next().await {
+            Some(event) => Ok(message(event?)),
+            None => Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "the terminal event stream was closed",
+            )),
+        }
+    }
 }
 
 /// Message triggered by a terminal event, if any.
