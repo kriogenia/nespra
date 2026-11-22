@@ -12,8 +12,13 @@
 //! auth = { mtls = {} }
 //! ```
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    fs, io,
+    path::{Path, PathBuf},
+};
 
+use directories::ProjectDirs;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -28,7 +33,40 @@ pub struct Config {
     pub targets: BTreeMap<String, Target>,
 }
 
+/// Default location of the configuration file, like `~/.config/lazyvespa/config.toml` on
+/// Linux. `None` when the home directory cannot be found.
+pub fn default_path() -> Option<PathBuf> {
+    ProjectDirs::from("", "", "lazyvespa").map(|dirs| dirs.config_dir().join("config.toml"))
+}
+
 impl Config {
+    /// Loads the configuration file.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the file cannot be read or is not a valid configuration.
+    pub fn load(path: &Path) -> Result<Self, ConfigError> {
+        let toml = fs::read_to_string(path).map_err(|source| ConfigError::Read {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        Config::from_toml(&toml)
+    }
+
+    /// Loads the configuration file, or an empty configuration if it does not exist.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the file exists but cannot be read or is not a valid configuration.
+    pub fn load_or_default(path: &Path) -> Result<Self, ConfigError> {
+        match Config::load(path) {
+            Err(ConfigError::Read { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
+                Ok(Config::default())
+            }
+            result => result,
+        }
+    }
+
     /// Parses and validates a configuration in TOML.
     ///
     /// # Errors
@@ -119,6 +157,14 @@ pub enum Auth {
 /// Errors of an invalid [`Config`].
 #[derive(Debug, Error)]
 pub enum ConfigError {
+    /// The configuration file could not be read.
+    #[error("Unable to read {}: {source}", path.display())]
+    Read {
+        /// Path of the file.
+        path: PathBuf,
+        /// Cause of the failure.
+        source: io::Error,
+    },
     /// The TOML is not valid or does not match the configuration format.
     #[error("Invalid configuration: {0}")]
     Parse(#[from] toml::de::Error),
@@ -129,7 +175,44 @@ pub enum ConfigError {
 
 #[cfg(test)]
 mod test {
+    use std::io::Write;
+
     use super::*;
+
+    #[test]
+    fn test_load_a_file() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        write!(file, "[targets.a]\nendpoint = \"http://a:8080\"").unwrap();
+        let config = Config::load(file.path()).unwrap();
+        assert!(config.target("a").is_some());
+        assert_eq!(Config::load_or_default(file.path()).unwrap(), config);
+    }
+
+    #[test]
+    fn test_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        assert!(matches!(Config::load(&path), Err(ConfigError::Read { .. })));
+        assert_eq!(Config::load_or_default(&path).unwrap(), Config::default());
+    }
+
+    #[test]
+    fn test_invalid_file_is_not_replaced_by_the_default() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        write!(file, "targets = 1").unwrap();
+        assert!(matches!(
+            Config::load_or_default(file.path()),
+            Err(ConfigError::Parse(_))
+        ));
+    }
+
+    #[test]
+    fn test_default_path() {
+        if let Some(path) = default_path() {
+            assert!(path.ends_with("config.toml"));
+            assert!(path.parent().unwrap().ends_with("lazyvespa"));
+        }
+    }
 
     #[test]
     fn test_empty_config() {
