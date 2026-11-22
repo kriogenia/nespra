@@ -2,6 +2,8 @@ use std::time::Duration;
 
 use serde::{Serialize, Serializer};
 
+use crate::error::ParseError;
+
 /// Helper model to build requests.
 ///
 /// While the yql is actually a required parameter it can still be built without providing
@@ -129,6 +131,34 @@ impl<E> Request<E> {
     }
 }
 
+/// Parses a timeout written like in the Vespa query API: a number of seconds, optionally
+/// followed by the unit `s` or `ms`, like `2`, `1.5s` or `500ms`. Meant for timeouts given
+/// by users, to set them in [`Request::timeout`].
+///
+/// ```
+/// # use std::time::Duration;
+/// use nespra::search::parse_timeout;
+///
+/// assert_eq!(parse_timeout("500ms"), Ok(Duration::from_millis(500)));
+/// assert_eq!(parse_timeout("1.5s"), Ok(Duration::from_millis(1500)));
+/// assert_eq!(parse_timeout("2"), Ok(Duration::from_secs(2)));
+/// assert!(parse_timeout("soon").is_err());
+/// ```
+///
+/// # Errors
+///
+/// Fails if it is not a positive number of seconds or milliseconds.
+pub fn parse_timeout(value: &str) -> Result<Duration, ParseError> {
+    let invalid = || ParseError::new("timeout", value, "500ms, 1.5s, 2 (seconds)");
+    let lowercase = value.trim().to_ascii_lowercase();
+    let (number, unit_secs) = match lowercase.strip_suffix("ms") {
+        Some(millis) => (millis, 0.001),
+        None => (lowercase.strip_suffix('s').unwrap_or(&lowercase), 1.0),
+    };
+    let number: f64 = number.trim().parse().map_err(|_| invalid())?;
+    Duration::try_from_secs_f64(number * unit_secs).map_err(|_| invalid())
+}
+
 fn serialize_timeout<S: Serializer>(
     timeout: &Option<Duration>,
     serializer: S,
@@ -177,7 +207,7 @@ mod test {
 
     use std::time::Duration;
 
-    use crate::search::{Presentation, SimpleRequest, TensorFormat};
+    use crate::search::{Presentation, SimpleRequest, TensorFormat, parse_timeout};
 
     #[test]
     fn serialize_presentation() {
@@ -224,6 +254,34 @@ mod test {
         let copy = request.clone();
         assert_eq!(copy, request);
         assert_ne!(copy.offset(1), request);
+    }
+
+    #[test]
+    fn parse_timeouts() {
+        for (value, timeout) in [
+            ("500ms", Duration::from_millis(500)),
+            ("1.5s", Duration::from_millis(1500)),
+            ("2", Duration::from_secs(2)),
+            (" 0.25 S ", Duration::from_millis(250)),
+            ("10 ms", Duration::from_millis(10)),
+            ("0", Duration::ZERO),
+        ] {
+            assert_eq!(parse_timeout(value), Ok(timeout), "{value}");
+        }
+    }
+
+    #[test]
+    fn parse_invalid_timeouts() {
+        for value in ["", "ms", "soon", "-1s", "1m", "1h", "NaN", "inf", "1e400"] {
+            assert!(parse_timeout(value).is_err(), "{value} must be rejected");
+        }
+    }
+
+    #[test]
+    fn parsed_timeouts_are_sent_in_milliseconds() {
+        let request = SimpleRequest::new("yql").timeout(parse_timeout("1.5s").unwrap());
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["timeout"], json!("1500ms"));
     }
 
     #[test]

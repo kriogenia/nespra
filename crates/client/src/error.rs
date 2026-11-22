@@ -72,7 +72,7 @@ pub enum CodecError {
 }
 
 /// A string that is not a valid value of the type it was parsed into, such as
-/// [`Format`](crate::Format) or [`HttpVersion`](crate::HttpVersion).
+/// [`Format`](crate::Format), [`HttpVersion`](crate::HttpVersion) or a timeout.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[error("Unknown {kind} {value:?}, expected one of: {expected}")]
 pub struct ParseError {
