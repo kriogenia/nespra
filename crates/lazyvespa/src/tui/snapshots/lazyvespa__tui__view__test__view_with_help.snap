@@ -2,11 +2,11 @@
 source: crates/lazyvespa/src/tui/view.rs
 expression: render(&model).backend()
 ---
-"┌───────────────────────────────────── no target ┐"
-"│      ┌ Keys ────────────────────────────┐      │"
-"│      │       Esc  close                 │      │"
-"│      │         :  command               │      │"
-"│      │         ?  help                  │      │"
-"│      │ q, Ctrl+C  quit                  │      │"
-"└──────└──────────────────────────────────┘──────┘"
-" : command · ? help · q quit                      "
+" lazyvespa  no target, use --url or --target                          "
+"┌────────────────┌ Keys ────────────────────────────┐────────────────┐"
+"│                │       Esc  close                 │                │"
+"│                │         :  command               │                │"
+"│                │         ?  help                  │                │"
+"│                │ q, Ctrl+C  quit                  │                │"
+"└────────────────└──────────────────────────────────┘────────────────┘"
+" : command · ? help · q quit                                          "

@@ -2,11 +2,11 @@
 source: crates/lazyvespa/src/tui/view.rs
 expression: render(&model).backend()
 ---
-"┌───────────────── local · http://localhost:8080 ┐"
-"│                    lazyvespa                   │"
-"│                                                │"
-"│                                                │"
-"│                                                │"
-"│                                                │"
-"└────────────────────────────────────────────────┘"
-" : command · ? help · q quit                      "
+" lazyvespa  local  self-hosted  http://localhost:8080                 "
+"┌────────────────────────────────────────────────────────────────────┐"
+"│                                                                    │"
+"│                                                                    │"
+"│                                                                    │"
+"│                                                                    │"
+"└────────────────────────────────────────────────────────────────────┘"
+" : command · ? help · q quit                                          "

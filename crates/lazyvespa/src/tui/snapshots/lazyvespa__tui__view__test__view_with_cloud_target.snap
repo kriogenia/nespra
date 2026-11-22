@@ -1,0 +1,12 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+" lazyvespa  prod  cloud acme.search.default  https://abc.vespa-app.clo"
+"┌────────────────────────────────────────────────────────────────────┐"
+"│                                                                    │"
+"│                                                                    │"
+"│                                                                    │"
+"│                                                                    │"
+"└────────────────────────────────────────────────────────────────────┘"
+" : command · ? help · q quit                                          "

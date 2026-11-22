@@ -6,6 +6,7 @@ mod keymap;
 mod message;
 mod model;
 mod palette;
+mod status_bar;
 mod update;
 mod view;
 

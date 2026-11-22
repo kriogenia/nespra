@@ -1,27 +1,24 @@
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Layout},
+    layout::{Constraint, Layout},
     style::Stylize,
     text::Line,
-    widgets::{Block, Paragraph},
+    widgets::Block,
 };
 
-use super::{Model, help, keymap, model::Overlay, update::active_bindings};
+use super::{Model, help, keymap, model::Overlay, status_bar, update::active_bindings};
 
 /// Renders the model. It only reads the state, never changes it.
 pub fn view(model: &Model, frame: &mut Frame) {
-    let [main, footer] =
-        Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
+    let [header, main, footer] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .areas(frame.area());
 
-    let target = match model.target() {
-        Some(active) => Line::from(format!(" {} · {} ", active.name, active.target.endpoint)),
-        None => Line::from(" no target ").dim(),
-    };
-    let title = Paragraph::new("lazyvespa")
-        .bold()
-        .alignment(Alignment::Center)
-        .block(Block::bordered().title_top(target.right_aligned()));
-    frame.render_widget(title, main);
+    status_bar::render(model.target(), frame, header);
+    frame.render_widget(Block::bordered(), main);
     match (model.overlay(), model.notice()) {
         (Some(Overlay::Palette(palette)), _) => {
             let line = format!(":{}", palette.input());
@@ -60,10 +57,13 @@ mod test {
 
     use super::*;
 
-    use crate::core::{config::Target, connection::ActiveTarget};
+    use crate::core::{
+        config::{CloudApplication, Target},
+        connection::ActiveTarget,
+    };
 
     fn render(model: &Model) -> Terminal<TestBackend> {
-        let mut terminal = Terminal::new(TestBackend::new(50, 8)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(70, 8)).unwrap();
         terminal.draw(|frame| view(model, frame)).unwrap();
         terminal
     }
@@ -95,6 +95,18 @@ mod test {
     fn test_view_with_target() {
         let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
         let model = Model::new(Some(target.unwrap()));
+        assert_snapshot!(render(&model).backend());
+    }
+
+    #[test]
+    fn test_view_with_cloud_target() {
+        let mut target = Target::self_hosted("https://abc.vespa-app.cloud");
+        target.cloud = Some(CloudApplication {
+            tenant: "acme".to_string(),
+            application: "search".to_string(),
+            instance: "default".to_string(),
+        });
+        let model = Model::new(Some(ActiveTarget::open("prod", target).unwrap()));
         assert_snapshot!(render(&model).backend());
     }
 }
