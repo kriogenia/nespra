@@ -2,7 +2,10 @@
 
 use std::{collections::BTreeSet, num::ParseIntError};
 
-use nespra::search::Request;
+use nespra::{
+    error::ParseError,
+    search::{Request, parse_timeout},
+};
 use serde_json::{Map, Number, Value};
 use thiserror::Error;
 
@@ -36,7 +39,7 @@ impl QueryDraft {
 
     /// Search request of the draft.
     ///
-    /// `hits` and `offset` go to their typed fields. The other parameters are sent as
+    /// `hits`, `offset` and `timeout` go to their typed fields. The other parameters are sent as
     /// written, except values that look like booleans or numbers, sent as such. Parameters
     /// with a blank name and value are skipped.
     ///
@@ -63,6 +66,10 @@ impl QueryDraft {
                 }
                 ("hits", value) => request.hits = Some(count(name, value)?),
                 ("offset", value) => request.offset = Some(count(name, value)?),
+                ("timeout", value) => {
+                    request.timeout =
+                        Some(parse_timeout(value).map_err(QueryError::InvalidTimeout)?);
+                }
                 (name, value) => {
                     request.extra_fields.insert(name.to_string(), typed(value));
                 }
@@ -118,10 +125,15 @@ pub enum QueryError {
         /// Why the value is not valid.
         source: ParseIntError,
     },
+    /// The timeout is not a duration Vespa understands.
+    #[error("Invalid timeout: {0}")]
+    InvalidTimeout(ParseError),
 }
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     use serde_json::json;
 
     use super::*;
@@ -144,6 +156,7 @@ mod test {
         assert_eq!(request.yql, "select * from doc where userQuery()");
         assert_eq!(request.hits, Some(5));
         assert_eq!(request.offset, Some(10));
+        assert_eq!(request.timeout, Some(Duration::from_millis(500)));
         assert_eq!(
             body(&draft),
             json!({
@@ -181,6 +194,15 @@ mod test {
                 "{value} must be rejected"
             );
         }
+    }
+
+    #[test]
+    fn test_invalid_timeout() {
+        let draft = QueryDraft::new("select * from doc where true").param("timeout", "soon");
+        assert!(matches!(
+            draft.request(),
+            Err(QueryError::InvalidTimeout(_))
+        ));
     }
 
     #[test]
