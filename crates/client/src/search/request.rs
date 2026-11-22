@@ -35,7 +35,7 @@ use serde::{Serialize, Serializer};
 /// assert_eq!(value["query"], json!("Is statin use connected to breast cancer?"));
 /// assert!(value.get("queryProfile").is_none());
 /// ```
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Request<E> {
     pub yql: String,
@@ -143,7 +143,7 @@ fn serialize_timeout<S: Serializer>(
 ///
 /// Knowingly evades the `format` option as it would mess with the format specified in the client or
 /// the search call. Use those instead.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Presentation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bolding: Option<bool>,
@@ -157,7 +157,7 @@ pub struct Presentation {
     pub format_tensors: Option<TensorFormat>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum TensorFormat {
@@ -211,6 +211,19 @@ mod test {
         assert_eq!(value["offset"], json!(20));
         assert_eq!(value["timeout"], json!("2000ms"));
         assert!(value.get("presentation").is_none());
+    }
+
+    #[test]
+    fn requests_can_be_cloned_and_compared() {
+        let request = SimpleRequest::new("select * from doc where true")
+            .hits(10)
+            .presentation(Presentation {
+                format_tensors: Some(TensorFormat::Short),
+                ..Default::default()
+            });
+        let copy = request.clone();
+        assert_eq!(copy, request);
+        assert_ne!(copy.offset(1), request);
     }
 
     #[test]
