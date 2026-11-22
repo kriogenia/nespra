@@ -20,6 +20,7 @@ nespra = { path = "../client", features = ["admin"] }
 ratatui = "0.30.2"
 ratatui-textarea = "0.9.4"
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 toml = "1.2.1"
