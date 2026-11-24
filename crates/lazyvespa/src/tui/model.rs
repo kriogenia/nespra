@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use super::{
     palette::Palette,
@@ -6,7 +6,13 @@ use super::{
     results::{ResultsMsg, ResultsView},
     target_picker::TargetPicker,
 };
-use crate::core::{config::Config, connection::ActiveTarget, search::SearchOutcome};
+use crate::core::{
+    config::Config,
+    connection::ActiveTarget,
+    history::{Histories, History, HistoryError},
+    query::QueryDraft,
+    search::SearchOutcome,
+};
 
 /// State of the whole application.
 #[derive(Debug, Default)]
@@ -21,6 +27,8 @@ pub struct Model {
     searches: u64,
     results: ResultsView,
     pane: Pane,
+    histories: Histories,
+    history_path: Option<PathBuf>,
 }
 
 /// Part of the screen receiving the keys.
@@ -84,6 +92,25 @@ impl Model {
             target,
             ..Model::default()
         }
+    }
+
+    /// Uses the histories loaded from the file, saving the new queries in it.
+    ///
+    /// When they could not be loaded, the history starts empty and is not saved, so the
+    /// file is not overwritten, and the error is shown to the user.
+    pub fn with_history(mut self, path: PathBuf, loaded: Result<Histories, HistoryError>) -> Self {
+        match loaded {
+            Ok(histories) => {
+                self.histories = histories;
+                self.history_path = Some(path);
+            }
+            Err(error) => {
+                self.notice = Some(Notice::Error(format!(
+                    "{error}. The history will not be saved."
+                )));
+            }
+        }
+        self
     }
 
     /// Configuration of the application.
@@ -179,6 +206,24 @@ impl Model {
             Err(error) => SearchState::Failed(error),
         };
         true
+    }
+
+    /// History of the queries run against the current target.
+    pub fn history(&self) -> &History {
+        let name = self
+            .target
+            .as_ref()
+            .map_or("", |active| active.name.as_str());
+        self.histories.target(name)
+    }
+
+    /// Records a query run against the current target, returning the histories to save
+    /// and where, if they are saved.
+    pub(super) fn record_query(&mut self, query: QueryDraft) -> Option<(PathBuf, Histories)> {
+        let active = self.target.as_ref()?;
+        self.histories.record(&active.name, query);
+        let path = self.history_path.clone()?;
+        Some((path, self.histories.clone()))
     }
 
     /// Opens the help, or closes it if it is already open.

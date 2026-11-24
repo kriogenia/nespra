@@ -38,6 +38,21 @@ impl QueryDraft {
         self
     }
 
+    /// The draft as it is sent: the YQL and parameters trimmed, without the parameters
+    /// that have no value.
+    pub fn trimmed(&self) -> QueryDraft {
+        QueryDraft {
+            yql: self.yql.trim().to_string(),
+            params: self
+                .params
+                .iter()
+                .map(|(name, value)| (name.trim(), value.trim()))
+                .filter(|(_, value)| !value.is_empty())
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect(),
+        }
+    }
+
     /// Search request of the draft.
     ///
     /// `hits`, `offset` and `timeout` go to their typed fields. The other parameters are sent as
@@ -141,6 +156,19 @@ mod test {
 
     fn body(draft: &QueryDraft) -> Value {
         serde_json::to_value(draft.request().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn test_trimmed() {
+        let draft = QueryDraft::new(" select * from doc where true\n")
+            .param("query", "")
+            .param(" hits ", " 5 ")
+            .param("ranking.profile", "  ");
+        assert_eq!(
+            draft.trimmed(),
+            QueryDraft::new("select * from doc where true").param("hits", "5")
+        );
+        assert_eq!(draft.trimmed().request(), draft.request());
     }
 
     #[test]

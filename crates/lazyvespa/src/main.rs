@@ -2,7 +2,10 @@ mod cli;
 
 use clap::Parser;
 use color_eyre::Result;
-use lazyvespa::tui::{self, Model};
+use lazyvespa::{
+    core::history::{self, Histories},
+    tui::{self, Model},
+};
 
 use crate::cli::Cli;
 
@@ -11,8 +14,14 @@ async fn main() -> Result<()> {
     install_error_hooks()?;
     let (config, target) = Cli::parse().load()?;
 
+    let mut model = Model::new(config, target);
+    if let Some(path) = history::default_path() {
+        let loaded = Histories::load(&path);
+        model = model.with_history(path, loaded);
+    }
+
     let mut terminal = ratatui::init();
-    let result = tui::run(&mut terminal, Model::new(config, target)).await;
+    let result = tui::run(&mut terminal, model).await;
     ratatui::restore();
     Ok(result?)
 }

@@ -41,6 +41,8 @@ pub enum Message {
         /// Response, shared as it is not cloneable, or the error.
         result: Result<Arc<SearchOutcome>, String>,
     },
+    /// The history could not be saved, with the reason.
+    HistoryNotSaved(String),
     /// Close the open overlay.
     CloseOverlay,
     /// Close the application.

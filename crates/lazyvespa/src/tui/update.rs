@@ -72,6 +72,7 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
                 }
             }
         }
+        Message::HistoryNotSaved(error) => model.set_notice(Notice::Error(error)),
         Message::CloseOverlay => model.close_overlay(),
         Message::Quit => model.quit(),
     }
@@ -98,11 +99,18 @@ fn run_query(model: &mut Model) -> Vec<Effect> {
         ));
         return Vec::new();
     };
-    match model.editor().draft().request() {
+    let draft = model.editor().draft();
+    match draft.request() {
         Ok(request) => {
             let id = model.start_search();
             model.set_notice(Notice::Info("Searching…".to_string()));
-            vec![Effect::Search { id, vespa, request }]
+            let save = model
+                .record_query(draft.trimmed())
+                .map(|(path, histories)| Effect::SaveHistory { path, histories });
+            [Effect::Search { id, vespa, request }]
+                .into_iter()
+                .chain(save)
+                .collect()
         }
         Err(error) => {
             model.set_notice(Notice::Error(error.to_string()));
@@ -166,6 +174,8 @@ mod test {
     use crate::core::{
         config::{Config, Target},
         connection::ActiveTarget,
+        history::{Histories, HistoryError},
+        query::QueryDraft,
         search::SearchOutcome,
     };
 
@@ -543,5 +553,89 @@ mod test {
         );
         assert_eq!(model.target().unwrap().name, "local");
         assert_eq!(model.notice(), Some(&Notice::Error("no cert".to_string())));
+    }
+
+    #[test]
+    fn test_run_queries_are_recorded_in_the_history() {
+        let mut model = connected();
+        let _ = update(&mut model, Message::RunQuery);
+        let _ = update(&mut model, Message::RunQuery);
+        let recorded: Vec<_> = model.history().entries().collect();
+        assert_eq!(recorded, [&model.editor().draft().trimmed()]);
+    }
+
+    #[test]
+    fn test_invalid_queries_are_not_recorded() {
+        let mut model = connected();
+        // A parameter with value but without name
+        let _ = press(&mut model, KeyCode::Tab);
+        let _ = type_text(&mut model, "a");
+        let _ = press(&mut model, KeyCode::Tab);
+        let _ = type_text(&mut model, "5");
+        let _ = press(&mut model, KeyCode::Esc);
+        let effects = update(&mut model, Message::RunQuery);
+        assert!(effects.is_empty());
+        assert!(matches!(model.notice(), Some(Notice::Error(_))));
+        assert!(model.history().is_empty());
+    }
+
+    #[test]
+    fn test_the_history_is_saved_after_running() {
+        let mut model = connected().with_history("history.json".into(), Ok(Histories::default()));
+        let effects = update(&mut model, Message::RunQuery);
+        let [
+            Effect::Search { .. },
+            Effect::SaveHistory { path, histories },
+        ] = effects.as_slice()
+        else {
+            panic!("the history must be saved, got {effects:?}");
+        };
+        assert_eq!(path.to_str(), Some("history.json"));
+        assert_eq!(histories.target("local").len(), 1);
+    }
+
+    #[test]
+    fn test_the_history_is_by_target() {
+        let mut histories = Histories::default();
+        histories.record("prod", QueryDraft::new("select * from prod where true"));
+        let mut model = connected().with_history("history.json".into(), Ok(histories));
+        assert!(model.history().is_empty());
+
+        let prod = ActiveTarget::open("prod", Target::self_hosted("http://prod:8080"));
+        let _ = update(
+            &mut model,
+            Message::TargetOpened(Ok(Box::new(prod.unwrap()))),
+        );
+        assert_eq!(model.history().len(), 1);
+    }
+
+    #[test]
+    fn test_an_invalid_history_is_not_saved() {
+        let invalid = serde_json::from_str::<serde_json::Value>("nope").unwrap_err();
+        let error = HistoryError::Parse {
+            path: "history.json".into(),
+            source: invalid,
+        };
+        let mut model = connected().with_history("history.json".into(), Err(error));
+        assert!(
+            matches!(model.notice(), Some(Notice::Error(e)) if e.ends_with("will not be saved."))
+        );
+
+        let effects = update(&mut model, Message::RunQuery);
+        assert!(matches!(effects.as_slice(), [Effect::Search { .. }]));
+        assert_eq!(model.history().len(), 1);
+    }
+
+    #[test]
+    fn test_history_not_saved() {
+        let mut model = connected();
+        let _ = update(
+            &mut model,
+            Message::HistoryNotSaved("disk full".to_string()),
+        );
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Error("disk full".to_string()))
+        );
     }
 }
