@@ -14,14 +14,14 @@
 
 use std::{
     collections::BTreeMap,
-    env,
-    ffi::OsString,
     fs, io,
     path::{Path, PathBuf},
 };
 
 use serde::Deserialize;
 use thiserror::Error;
+
+use crate::core::dirs;
 
 /// Configuration of the application.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
@@ -38,16 +38,7 @@ pub struct Config {
 /// or `~/.config/lazyvespa/config.toml` on every platform. `None` when the home directory
 /// cannot be found.
 pub fn default_path() -> Option<PathBuf> {
-    config_path(env::var_os("XDG_CONFIG_HOME"), env::home_dir())
-}
-
-fn config_path(xdg_config_home: Option<OsString>, home: Option<PathBuf>) -> Option<PathBuf> {
-    let config_dir = match xdg_config_home {
-        // The specification asks to ignore relative paths
-        Some(dir) if Path::new(&dir).is_absolute() => PathBuf::from(dir),
-        _ => home?.join(".config"),
-    };
-    Some(config_dir.join("lazyvespa").join("config.toml"))
+    dirs::config_dir().map(|dir| dir.join("config.toml"))
 }
 
 impl Config {
@@ -246,25 +237,6 @@ mod test {
             Config::load_or_default(file.path()),
             Err(ConfigError::Parse(_))
         ));
-    }
-
-    #[test]
-    fn test_config_path_in_the_home() {
-        let path = config_path(None, Some("/home/me".into()));
-        assert_eq!(path, Some("/home/me/.config/lazyvespa/config.toml".into()));
-    }
-
-    #[test]
-    fn test_config_path_in_xdg_config_home() {
-        let path = config_path(Some("/xdg".into()), Some("/home/me".into()));
-        assert_eq!(path, Some("/xdg/lazyvespa/config.toml".into()));
-    }
-
-    #[test]
-    fn test_relative_xdg_config_home_is_ignored() {
-        let path = config_path(Some("relative".into()), Some("/home/me".into()));
-        assert_eq!(path, Some("/home/me/.config/lazyvespa/config.toml".into()));
-        assert_eq!(config_path(Some("relative".into()), None), None);
     }
 
     #[test]

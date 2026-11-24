@@ -6,6 +6,7 @@ use nespra::{
     error::ParseError,
     search::{Request, parse_timeout},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use thiserror::Error;
 
@@ -14,7 +15,7 @@ use thiserror::Error;
 pub type QueryRequest = Request<Map<String, Value>>;
 
 /// A query: the YQL and the request parameters, as typed by the user.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QueryDraft {
     /// YQL of the query.
     pub yql: String,
