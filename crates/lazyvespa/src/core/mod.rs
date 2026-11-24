@@ -3,5 +3,6 @@
 pub mod cloud;
 pub mod config;
 pub mod connection;
+pub mod history;
 pub mod query;
 pub mod search;
