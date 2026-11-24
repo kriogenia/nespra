@@ -1,0 +1,16 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+" lazyvespa  no target, use --url or --target                                              "
+"┌ Query ─────────────────────────────────────────┐┌ Parameters · editing ────────────────┐"
+"│select * from sources * where true              ││query                                 │"
+"│                                                ││hits             5                    │"
+"│                                                ││ranking.profile                       │"
+"│                                                ││                                      │"
+"│                                                ││                                      │"
+"│                                                ││                                      │"
+"└────────────────────────────────────────────────┘└──────────────────────────────────────┘"
+"┌ Results ───────────────────────────────────────────────────────────────────────────────┐"
+"└────────────────────────────────────────────────────────────────────────────────────────┘"
+" Tab name/value · Ctrl+R run · Esc stop editing · Ctrl+C quit                             "

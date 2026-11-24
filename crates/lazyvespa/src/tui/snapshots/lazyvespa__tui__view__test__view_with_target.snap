@@ -1,0 +1,16 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+" lazyvespa  local  self-hosted  http://localhost:8080                                     "
+"┌ Query ─────────────────────────────────────────┐┌ Parameters ──────────────────────────┐"
+"│select * from sources * where true              ││query                                 │"
+"│                                                ││hits                                  │"
+"│                                                ││ranking.profile                       │"
+"│                                                ││                                      │"
+"│                                                ││                                      │"
+"│                                                ││                                      │"
+"└────────────────────────────────────────────────┘└──────────────────────────────────────┘"
+"┌ Results ───────────────────────────────────────────────────────────────────────────────┐"
+"└────────────────────────────────────────────────────────────────────────────────────────┘"
+" i edit · Tab parameters · Ctrl+R run · : command · T targets · ? help · q quit           "

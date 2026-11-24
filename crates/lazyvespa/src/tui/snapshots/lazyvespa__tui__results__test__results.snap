@@ -1,0 +1,11 @@
+---
+source: crates/lazyvespa/src/tui/results.rs
+expression: render_state(&search)
+---
+"┌ Results ─────────────────────────────────────────────────────────────────────┐"
+"│120 hits · coverage 100% · 8 ms in Vespa · 23 ms round trip                   │"
+"│#    relevance  id                sourc│{                                     │"
+"│1    0.9123     id:doc:doc::1     conte│  "id": "id:doc:doc::1",              │"
+"│2    0.5000     index:content/0/a conte│  "relevance": 0.91234,               │"
+"│                                       │  "source": "content"                 │"
+"└──────────────────────────────────────────────────────────────────────────────┘"

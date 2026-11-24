@@ -1,0 +1,16 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+" lazyvespa  no target, use --url or --target                                              "
+"┌ Query ─────────────────────────────────────────┐┌ Parameters ──────────────────────────┐"
+"│select * from sources * wh┌ Keys ────────────────────────────┐                          │"
+"│                          │       Esc  close                 │                          │"
+"│                          │Ctrl+R, F5  run                   │ile                       │"
+"│                          │         :  command               │                          │"
+"│                          │         T  targets               │                          │"
+"│                          │         ?  help                  │                          │"
+"└──────────────────────────│ q, Ctrl+C  quit                  │──────────────────────────┘"
+"┌ Results ─────────────────└──────────────────────────────────┘──────────────────────────┐"
+"└────────────────────────────────────────────────────────────────────────────────────────┘"
+" Esc close · Ctrl+R run · : command · T targets · ? help · q quit                         "
