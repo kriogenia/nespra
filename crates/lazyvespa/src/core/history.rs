@@ -2,14 +2,16 @@
 
 use std::{
     collections::{BTreeMap, VecDeque},
-    fs, io,
     path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-use crate::core::{dirs, query::QueryDraft};
+use crate::core::{
+    dirs,
+    query::QueryDraft,
+    store::{self, StoreError},
+};
 
 /// Maximum number of queries kept in a [`History`].
 pub const LIMIT: usize = 500;
@@ -76,42 +78,17 @@ impl Histories {
     /// # Errors
     ///
     /// Fails if the file exists but cannot be read or is not valid.
-    pub fn load(path: &Path) -> Result<Self, HistoryError> {
-        let json = match fs::read(path) {
-            Ok(json) => json,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Histories::default()),
-            Err(source) => {
-                return Err(HistoryError::Read {
-                    path: path.to_path_buf(),
-                    source,
-                });
-            }
-        };
-        serde_json::from_slice(&json).map_err(|source| HistoryError::Parse {
-            path: path.to_path_buf(),
-            source,
-        })
+    pub fn load(path: &Path) -> Result<Self, StoreError> {
+        store::load(path)
     }
 
-    /// Saves the histories to the file, creating its directory if needed.
-    ///
-    /// The file is replaced at once, so it is never left half written.
+    /// Saves the histories to the file, see [`store::save`].
     ///
     /// # Errors
     ///
     /// Fails if the directory or the file cannot be written.
-    pub fn save(&self, path: &Path) -> Result<(), HistoryError> {
-        let write_error = |source| HistoryError::Write {
-            path: path.to_path_buf(),
-            source,
-        };
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).map_err(write_error)?;
-        }
-        let json = serde_json::to_vec_pretty(self).expect("histories are always valid JSON");
-        let temporary = path.with_extension("json.tmp");
-        fs::write(&temporary, json).map_err(write_error)?;
-        fs::rename(&temporary, path).map_err(write_error)
+    pub fn save(&self, path: &Path) -> Result<(), StoreError> {
+        store::save(path, self)
     }
 
     /// History of the target, empty if no query was recorded for it.
@@ -126,35 +103,6 @@ impl Histories {
             .or_default()
             .record(query);
     }
-}
-
-/// Errors loading or saving the [`Histories`].
-#[derive(Error, Debug)]
-pub enum HistoryError {
-    /// The file could not be read.
-    #[error("Unable to read {}: {source}", path.display())]
-    Read {
-        /// Path of the file.
-        path: PathBuf,
-        /// Cause of the failure.
-        source: io::Error,
-    },
-    /// The file is not a valid history.
-    #[error("Invalid history in {}: {source}", path.display())]
-    Parse {
-        /// Path of the file.
-        path: PathBuf,
-        /// Cause of the failure.
-        source: serde_json::Error,
-    },
-    /// The file could not be written.
-    #[error("Unable to save {}: {source}", path.display())]
-    Write {
-        /// Path of the file.
-        path: PathBuf,
-        /// Cause of the failure.
-        source: io::Error,
-    },
 }
 
 #[cfg(test)]
@@ -226,7 +174,6 @@ mod test {
         histories.save(&path).unwrap();
 
         assert_eq!(Histories::load(&path).unwrap(), histories);
-        assert!(!path.with_extension("json.tmp").exists());
     }
 
     #[test]
@@ -237,24 +184,6 @@ mod test {
             serde_json::to_value(&histories).unwrap(),
             serde_json::json!({"local": [{"yql": "a", "params": [["hits", "5"]]}]})
         );
-    }
-
-    #[test]
-    fn test_load_a_missing_file() {
-        let dir = tempfile::tempdir().unwrap();
-        let histories = Histories::load(&dir.path().join("history.json")).unwrap();
-        assert_eq!(histories, Histories::default());
-    }
-
-    #[test]
-    fn test_load_an_invalid_file() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("history.json");
-        fs::write(&path, "not json").unwrap();
-        assert!(matches!(
-            Histories::load(&path),
-            Err(HistoryError::Parse { .. })
-        ));
     }
 
     #[test]

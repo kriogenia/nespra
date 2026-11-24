@@ -6,4 +6,6 @@ pub mod connection;
 pub mod dirs;
 pub mod history;
 pub mod query;
+pub mod saved;
 pub mod search;
+pub mod store;

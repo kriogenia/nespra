@@ -10,9 +10,10 @@ use super::{
 use crate::core::{
     config::Config,
     connection::ActiveTarget,
-    history::{Histories, History, HistoryError},
+    history::{Histories, History},
     query::QueryDraft,
     search::SearchOutcome,
+    store::StoreError,
 };
 
 /// State of the whole application.
@@ -101,7 +102,7 @@ impl Model {
     ///
     /// When they could not be loaded, the history starts empty and is not saved, so the
     /// file is not overwritten, and the error is shown to the user.
-    pub fn with_history(mut self, path: PathBuf, loaded: Result<Histories, HistoryError>) -> Self {
+    pub fn with_history(mut self, path: PathBuf, loaded: Result<Histories, StoreError>) -> Self {
         match loaded {
             Ok(histories) => {
                 self.histories = histories;

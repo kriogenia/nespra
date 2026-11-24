@@ -188,9 +188,10 @@ mod test {
     use crate::core::{
         config::{Config, Target},
         connection::ActiveTarget,
-        history::{Histories, HistoryError},
+        history::Histories,
         query::QueryDraft,
         search::SearchOutcome,
+        store::StoreError,
     };
 
     fn press(model: &mut Model, code: KeyCode) -> Vec<Effect> {
@@ -626,7 +627,7 @@ mod test {
     #[test]
     fn test_an_invalid_history_is_not_saved() {
         let invalid = serde_json::from_str::<serde_json::Value>("nope").unwrap_err();
-        let error = HistoryError::Parse {
+        let error = StoreError::Parse {
             path: "history.json".into(),
             source: invalid,
         };
