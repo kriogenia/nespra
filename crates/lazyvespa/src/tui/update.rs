@@ -20,7 +20,7 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             }
         }
         Message::ToggleHelp => model.toggle_help(),
-        Message::OpenPalette => model.open_palette(),
+        Message::OpenPalette(input) => model.open_palette(input),
         Message::Palette(message) => {
             let Some(result) = model.palette_mut().and_then(|p| p.update(message)) else {
                 return Vec::new();
@@ -82,7 +82,8 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
                 }
             }
         }
-        Message::HistoryNotSaved(error) => model.set_notice(Notice::Error(error)),
+        Message::SaveQuery(name) => return save_query(model, name),
+        Message::NotSaved(error) => model.set_notice(Notice::Error(error)),
         Message::CloseOverlay => model.close_overlay(),
         Message::Quit => model.quit(),
     }
@@ -129,6 +130,26 @@ fn run_query(model: &mut Model) -> Vec<Effect> {
     }
 }
 
+/// Saves the query of the editor under the name.
+fn save_query(model: &mut Model, name: String) -> Vec<Effect> {
+    let query = model.editor().draft().trimmed();
+    if query.yql.is_empty() {
+        model.set_notice(Notice::Error("There is no query to save".to_string()));
+        return Vec::new();
+    }
+    let notice = format!("Saved the query as {name:?}");
+    let (replaced, save) = model.save_query(name, query);
+    let notice = if replaced {
+        format!("{notice}, replacing the previous one")
+    } else {
+        notice
+    };
+    model.set_notice(Notice::Info(notice));
+    save.map(|(path, queries)| Effect::SaveQueries { path, queries })
+        .into_iter()
+        .collect()
+}
+
 /// Message running the command of the palette.
 fn command_message(command: Command) -> Message {
     match command {
@@ -137,6 +158,7 @@ fn command_message(command: Command) -> Message {
         Command::Context(Some(name)) => Message::SwitchTarget(name),
         Command::Context(None) => Message::OpenTargetPicker,
         Command::History => Message::OpenHistory,
+        Command::Save(name) => Message::SaveQuery(name),
     }
 }
 
@@ -190,6 +212,7 @@ mod test {
         connection::ActiveTarget,
         history::Histories,
         query::QueryDraft,
+        saved::SavedQueries,
         search::SearchOutcome,
         store::StoreError,
     };
@@ -644,10 +667,7 @@ mod test {
     #[test]
     fn test_history_not_saved() {
         let mut model = connected();
-        let _ = update(
-            &mut model,
-            Message::HistoryNotSaved("disk full".to_string()),
-        );
+        let _ = update(&mut model, Message::NotSaved("disk full".to_string()));
         assert_eq!(
             model.notice(),
             Some(&Notice::Error("disk full".to_string()))
@@ -693,5 +713,66 @@ mod test {
         let _ = type_text(&mut model, "H");
         assert_eq!(model.overlay(), None);
         assert!(model.editor().yql().ends_with('H'));
+    }
+
+    #[test]
+    fn test_save_the_query() {
+        let mut model =
+            Model::default().with_saved_queries("saved.json".into(), Ok(SavedQueries::default()));
+        let _ = type_text(&mut model, "s");
+        assert!(matches!(model.overlay(), Some(Overlay::Palette(p)) if p.input() == "save "));
+
+        let _ = type_text(&mut model, "all docs");
+        let effects = press(&mut model, KeyCode::Enter);
+
+        let [Effect::SaveQueries { path, queries }] = effects.as_slice() else {
+            panic!("the saved queries must be saved, got {effects:?}");
+        };
+        assert_eq!(path.to_str(), Some("saved.json"));
+        let expected = model.editor().draft().trimmed();
+        assert_eq!(queries.get("all docs"), Some(&expected));
+        assert_eq!(model.saved_queries(), queries);
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info("Saved the query as \"all docs\"".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_save_under_an_existing_name() {
+        let mut model = Model::default();
+        let _ = run_command(&mut model, "save q");
+        let effects = run_command(&mut model, "save q");
+        // Not saved in a file without one
+        assert!(effects.is_empty());
+        assert_eq!(model.saved_queries().len(), 1);
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info(
+                "Saved the query as \"q\", replacing the previous one".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_save_without_name() {
+        let mut model = Model::default();
+        let _ = run_command(&mut model, "save");
+        assert!(model.saved_queries().is_empty());
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Error(
+                "Missing argument, use :save <name>".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_save_an_empty_query() {
+        let mut model = Model::default();
+        model.editor_mut().load(&QueryDraft::new("  "));
+        let _ = run_command(&mut model, "save q");
+        assert!(model.saved_queries().is_empty());
+        assert!(matches!(model.notice(), Some(Notice::Error(_))));
     }
 }

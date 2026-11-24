@@ -143,7 +143,7 @@ mod test {
     #[test]
     fn test_view_with_palette() {
         let mut model = Model::default();
-        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenPalette);
+        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenPalette(""));
         for c in "ctx".chars() {
             let message = crate::tui::palette::PaletteMsg::Insert(c);
             let _ = crate::tui::update(&mut model, crate::tui::Message::Palette(message));
@@ -231,7 +231,7 @@ mod test {
         let line = hints(&[crate::tui::keymap::GLOBAL], 200);
         assert_eq!(
             line.to_string(),
-            " Ctrl+R run · : command · T targets · H history · ? help · q quit"
+            " Ctrl+R run · : command · T targets · H history · s save · ? help · q quit"
         );
     }
 

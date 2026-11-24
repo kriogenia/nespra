@@ -15,8 +15,8 @@ pub enum Message {
     Key(KeyEvent),
     /// Open or close the help.
     ToggleHelp,
-    /// Open the command palette.
-    OpenPalette,
+    /// Open the command palette with the text already typed.
+    OpenPalette(&'static str),
     /// Message of the command palette.
     Palette(PaletteMsg),
     /// Message of the query editor.
@@ -46,8 +46,10 @@ pub enum Message {
         /// Response, shared as it is not cloneable, or the error.
         result: Result<Arc<SearchOutcome>, String>,
     },
-    /// The history could not be saved, with the reason.
-    HistoryNotSaved(String),
+    /// Save the query of the editor under the name.
+    SaveQuery(String),
+    /// Some data could not be saved in its file, with the reason.
+    NotSaved(String),
     /// Close the open overlay.
     CloseOverlay,
     /// Close the application.

@@ -90,7 +90,7 @@ pub const GLOBAL: &[Binding] = &[
     },
     Binding {
         keys: &[Key::char(':')],
-        message: Message::OpenPalette,
+        message: Message::OpenPalette(""),
         description: "command",
     },
     Binding {
@@ -102,6 +102,11 @@ pub const GLOBAL: &[Binding] = &[
         keys: &[Key::char('H')],
         message: Message::OpenHistory,
         description: "history",
+    },
+    Binding {
+        keys: &[Key::char('s')],
+        message: Message::OpenPalette("save "),
+        description: "save",
     },
     Binding {
         keys: &[Key::char('?')],

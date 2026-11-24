@@ -12,6 +12,7 @@ use crate::core::{
     connection::ActiveTarget,
     history::{Histories, History},
     query::QueryDraft,
+    saved::SavedQueries,
     search::SearchOutcome,
     store::StoreError,
 };
@@ -29,8 +30,23 @@ pub struct Model {
     searches: u64,
     results: ResultsView,
     pane: Pane,
-    histories: Histories,
-    history_path: Option<PathBuf>,
+    histories: Stored<Histories>,
+    saved: Stored<SavedQueries>,
+}
+
+/// Data kept in a file between runs.
+#[derive(Debug, Default)]
+struct Stored<T> {
+    value: T,
+    /// Where the data is saved, `None` when it is not saved.
+    path: Option<PathBuf>,
+}
+
+impl<T: Clone> Stored<T> {
+    /// The data and where to save it, if it is saved.
+    fn to_save(&self) -> Option<(PathBuf, T)> {
+        Some((self.path.clone()?, self.value.clone()))
+    }
 }
 
 /// Part of the screen receiving the keys.
@@ -103,18 +119,43 @@ impl Model {
     /// When they could not be loaded, the history starts empty and is not saved, so the
     /// file is not overwritten, and the error is shown to the user.
     pub fn with_history(mut self, path: PathBuf, loaded: Result<Histories, StoreError>) -> Self {
+        self.histories = self.stored("history", path, loaded);
+        self
+    }
+
+    /// Uses the saved queries loaded from the file, saving the changes in it.
+    ///
+    /// When they could not be loaded, there are no saved queries and the changes are not
+    /// saved, so the file is not overwritten, and the error is shown to the user.
+    pub fn with_saved_queries(
+        mut self,
+        path: PathBuf,
+        loaded: Result<SavedQueries, StoreError>,
+    ) -> Self {
+        self.saved = self.stored("saved queries", path, loaded);
+        self
+    }
+
+    /// Data loaded from the file, saved in it. When it could not be loaded, it is empty
+    /// and not saved, and the error is shown to the user.
+    fn stored<T: Default>(
+        &mut self,
+        name: &str,
+        path: PathBuf,
+        loaded: Result<T, StoreError>,
+    ) -> Stored<T> {
         match loaded {
-            Ok(histories) => {
-                self.histories = histories;
-                self.history_path = Some(path);
-            }
+            Ok(value) => Stored {
+                value,
+                path: Some(path),
+            },
             Err(error) => {
                 self.notice = Some(Notice::Error(format!(
-                    "{error}. The history will not be saved."
+                    "{error}. The {name} will not be saved."
                 )));
+                Stored::default()
             }
         }
-        self
     }
 
     /// Configuration of the application.
@@ -218,16 +259,31 @@ impl Model {
             .target
             .as_ref()
             .map_or("", |active| active.name.as_str());
-        self.histories.target(name)
+        self.histories.value.target(name)
     }
 
     /// Records a query run against the current target, returning the histories to save
     /// and where, if they are saved.
     pub(super) fn record_query(&mut self, query: QueryDraft) -> Option<(PathBuf, Histories)> {
         let active = self.target.as_ref()?;
-        self.histories.record(&active.name, query);
-        let path = self.history_path.clone()?;
-        Some((path, self.histories.clone()))
+        self.histories.value.record(&active.name, query);
+        self.histories.to_save()
+    }
+
+    /// Queries saved by name.
+    pub fn saved_queries(&self) -> &SavedQueries {
+        &self.saved.value
+    }
+
+    /// Saves a query under the name, returning whether it replaced another one, and the
+    /// saved queries to save and where, if they are saved.
+    pub(super) fn save_query(
+        &mut self,
+        name: String,
+        query: QueryDraft,
+    ) -> (bool, Option<(PathBuf, SavedQueries)>) {
+        let replaced = self.saved.value.insert(name, query).is_some();
+        (replaced, self.saved.to_save())
     }
 
     /// Opens the help, or closes it if it is already open.
@@ -238,9 +294,9 @@ impl Model {
         };
     }
 
-    /// Opens an empty command palette.
-    pub(super) fn open_palette(&mut self) {
-        self.overlay = Some(Overlay::Palette(Palette::default()));
+    /// Opens the command palette with the text already typed.
+    pub(super) fn open_palette(&mut self, input: &str) {
+        self.overlay = Some(Overlay::Palette(Palette::with_input(input)));
     }
 
     /// Opens the list of the configured targets.
