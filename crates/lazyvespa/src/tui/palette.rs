@@ -31,6 +31,8 @@ pub enum Command {
     Quit,
     /// Connect to the target with this name, or pick one if there is no name.
     Context(Option<String>),
+    /// Pick a query run against the target.
+    History,
 }
 
 /// The typed text is not a valid command.
@@ -51,6 +53,7 @@ impl FromStr for Command {
         match (name, argument) {
             ("help" | "h" | "?", _) => Ok(Command::Help),
             ("quit" | "q" | "q!", _) => Ok(Command::Quit),
+            ("history" | "hist", _) => Ok(Command::History),
             ("ctx" | "context", target) => Ok(Command::Context(target.map(str::to_string))),
             _ => Err(CommandError::Unknown(s.trim().to_string())),
         }
@@ -136,6 +139,8 @@ mod test {
                 Command::Context(Some("local".to_string())),
             ),
             ("ctx", Command::Context(None)),
+            ("history", Command::History),
+            ("hist", Command::History),
         ] {
             assert_eq!(text.parse(), Ok(command));
         }

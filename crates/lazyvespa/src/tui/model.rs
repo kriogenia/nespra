@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use super::{
+    history_picker::HistoryPicker,
     palette::Palette,
     query_editor::QueryEditor,
     results::{ResultsMsg, ResultsView},
@@ -73,6 +74,8 @@ pub enum Overlay {
     Palette(Palette),
     /// List of targets to connect to.
     TargetPicker(TargetPicker),
+    /// List of the queries run against the target.
+    HistoryPicker(HistoryPicker),
 }
 
 /// Whether the application keeps running.
@@ -244,6 +247,19 @@ impl Model {
         let names = self.config.targets.keys().cloned().collect();
         let current = self.target.as_ref().map(|active| active.name.as_str());
         self.overlay = Some(Overlay::TargetPicker(TargetPicker::new(names, current)));
+    }
+
+    /// Opens the list of the queries run against the target.
+    pub(super) fn open_history_picker(&mut self) {
+        self.overlay = Some(Overlay::HistoryPicker(HistoryPicker::new(self.history())));
+    }
+
+    /// History picker, if it is open.
+    pub(super) fn history_picker_mut(&mut self) -> Option<&mut HistoryPicker> {
+        match &mut self.overlay {
+            Some(Overlay::HistoryPicker(picker)) => Some(picker),
+            _ => None,
+        }
     }
 
     /// Target picker, if it is open.

@@ -55,6 +55,7 @@ pub fn view(model: &Model, frame: &mut Frame) {
     match model.overlay() {
         Some(Overlay::Help) => help::render(&active_bindings(model), frame, frame.area()),
         Some(Overlay::TargetPicker(picker)) => picker.render(frame, main),
+        Some(Overlay::HistoryPicker(picker)) => picker.render(frame, main),
         _ => {}
     }
 }
@@ -172,6 +173,22 @@ mod test {
             Config::default(),
             Some(ActiveTarget::open("prod", target).unwrap()),
         );
+        assert_snapshot!(render(&model).backend());
+    }
+
+    #[test]
+    fn test_view_with_history_picker() {
+        let mut histories = crate::core::history::Histories::default();
+        for yql in [
+            "select * from doc where true",
+            "select * from music where true",
+        ] {
+            histories.record("local", crate::core::query::QueryDraft::new(yql));
+        }
+        let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
+        let mut model = Model::new(Config::default(), Some(target.unwrap()))
+            .with_history("history.json".into(), Ok(histories));
+        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenHistory);
         assert_snapshot!(render(&model).backend());
     }
 }

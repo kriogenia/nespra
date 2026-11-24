@@ -1,0 +1,12 @@
+---
+source: crates/lazyvespa/src/tui/history_picker.rs
+expression: "render(&HistoryPicker::default()).backend()"
+---
+"                                                            "
+"                                                            "
+"                                                            "
+"    ┌ History ─────────────────────────────────────────┐    "
+"    │ No queries run against this target yet           │    "
+"    └──────────────────────────────────────────────────┘    "
+"                                                            "
+"                                                            "

@@ -71,6 +71,26 @@ impl Default for ParamsForm {
 }
 
 impl ParamsForm {
+    /// Form with the default rows, with the values of the parameters, followed by the
+    /// rest of the parameters.
+    pub fn with_params<'a>(params: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
+        let mut form = ParamsForm::default();
+        for (name, value) in params {
+            match form
+                .rows
+                .iter_mut()
+                .find(|row| row.name == name && row.value.is_empty())
+            {
+                Some(row) => row.value = value.to_string(),
+                None => form.rows.push(Param {
+                    name: name.to_string(),
+                    value: value.to_string(),
+                }),
+            }
+        }
+        form
+    }
+
     /// Rows of the form, in order.
     pub fn params(&self) -> &[Param] {
         &self.rows
@@ -214,6 +234,26 @@ impl ParamsForm {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_with_params_fills_the_default_rows() {
+        let form = ParamsForm::with_params([("hits", "5"), ("timeout", "1s"), ("hits", "6")]);
+        let rows: Vec<_> = form
+            .params()
+            .iter()
+            .map(|param| (param.name.as_str(), param.value.as_str()))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("query", ""),
+                ("hits", "5"),
+                ("ranking.profile", ""),
+                ("timeout", "1s"),
+                ("hits", "6")
+            ]
+        );
+    }
 
     fn type_text(form: &mut ParamsForm, text: &str) {
         for c in text.chars() {

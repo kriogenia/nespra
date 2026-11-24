@@ -3,7 +3,8 @@ use std::sync::Arc;
 use crossterm::event::KeyEvent;
 
 use super::{
-    palette::PaletteMsg, query_editor::EditorMsg, results::ResultsMsg, target_picker::PickerMsg,
+    history_picker::HistoryMsg, palette::PaletteMsg, query_editor::EditorMsg, results::ResultsMsg,
+    target_picker::PickerMsg,
 };
 use crate::core::{connection::ActiveTarget, search::SearchOutcome};
 
@@ -28,6 +29,10 @@ pub enum Message {
     OpenTargetPicker,
     /// Message of the target picker.
     Picker(PickerMsg),
+    /// Open the list of the queries run against the target.
+    OpenHistory,
+    /// Message of the history picker.
+    History(HistoryMsg),
     /// Connect to the configured target with this name.
     SwitchTarget(String),
     /// Result of connecting to a target. Boxed as it is much bigger than other messages.

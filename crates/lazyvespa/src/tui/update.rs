@@ -42,6 +42,16 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             model.close_overlay();
             return update(model, Message::SwitchTarget(name));
         }
+        Message::OpenHistory => model.open_history_picker(),
+        Message::History(message) => {
+            let Some(query) = model.history_picker_mut().and_then(|p| p.update(message)) else {
+                return Vec::new();
+            };
+            model.close_overlay();
+            model.editor_mut().load(&query);
+            model.focus_pane(Pane::Editor);
+            model.set_notice(Notice::Info("Query loaded from the history".to_string()));
+        }
         Message::SwitchTarget(name) => match model.config().target(&name) {
             Some(target) => {
                 let target = target.clone();
@@ -126,6 +136,7 @@ fn command_message(command: Command) -> Message {
         Command::Quit => Message::Quit,
         Command::Context(Some(name)) => Message::SwitchTarget(name),
         Command::Context(None) => Message::OpenTargetPicker,
+        Command::History => Message::OpenHistory,
     }
 }
 
@@ -134,6 +145,9 @@ pub(super) fn active_bindings(model: &Model) -> Vec<&'static [Binding]> {
     match model.overlay() {
         Some(Overlay::TargetPicker(_)) => {
             vec![keymap::TARGET_PICKER, keymap::OVERLAY, keymap::GLOBAL]
+        }
+        Some(Overlay::HistoryPicker(_)) => {
+            vec![keymap::HISTORY_PICKER, keymap::OVERLAY, keymap::GLOBAL]
         }
         Some(_) => vec![keymap::OVERLAY, keymap::GLOBAL],
         None if model.pane() == Pane::Results => vec![keymap::RESULTS, keymap::GLOBAL],
@@ -637,5 +651,46 @@ mod test {
             model.notice(),
             Some(&Notice::Error("disk full".to_string()))
         );
+    }
+
+    #[test]
+    fn test_load_a_query_from_the_history() {
+        let mut histories = Histories::default();
+        histories.record("local", QueryDraft::new("select * from music where true"));
+        histories.record("local", QueryDraft::new("select * from doc where true"));
+        let mut model = connected().with_history("history.json".into(), Ok(histories));
+        model.focus_pane(Pane::Results);
+
+        let _ = type_text(&mut model, "H");
+        assert!(matches!(model.overlay(), Some(Overlay::HistoryPicker(_))));
+        let _ = type_text(&mut model, "j");
+        let _ = press(&mut model, KeyCode::Enter);
+
+        assert_eq!(model.overlay(), None);
+        assert_eq!(model.editor().yql(), "select * from music where true");
+        assert_eq!(model.pane(), Pane::Editor);
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info("Query loaded from the history".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_history_command() {
+        let mut model = connected();
+        let _ = run_command(&mut model, "history");
+        assert!(matches!(model.overlay(), Some(Overlay::HistoryPicker(_))));
+        // Nothing to load from an empty history
+        let _ = press(&mut model, KeyCode::Enter);
+        assert!(matches!(model.overlay(), Some(Overlay::HistoryPicker(_))));
+    }
+
+    #[test]
+    fn test_h_is_text_while_editing() {
+        let mut model = connected();
+        let _ = press(&mut model, KeyCode::Char('i'));
+        let _ = type_text(&mut model, "H");
+        assert_eq!(model.overlay(), None);
+        assert!(model.editor().yql().ends_with('H'));
     }
 }

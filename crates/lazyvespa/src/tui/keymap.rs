@@ -6,8 +6,8 @@ use std::fmt;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{
-    Message, params_form::ParamsMsg, query_editor::EditorMsg, results::ResultsMsg,
-    target_picker::PickerMsg,
+    Message, history_picker::HistoryMsg, params_form::ParamsMsg, query_editor::EditorMsg,
+    results::ResultsMsg, target_picker::PickerMsg,
 };
 
 /// A key, optionally pressed together with modifiers.
@@ -97,6 +97,11 @@ pub const GLOBAL: &[Binding] = &[
         keys: &[Key::char('T')],
         message: Message::OpenTargetPicker,
         description: "targets",
+    },
+    Binding {
+        keys: &[Key::char('H')],
+        message: Message::OpenHistory,
+        description: "history",
     },
     Binding {
         keys: &[Key::char('?')],
@@ -241,6 +246,25 @@ pub const TARGET_PICKER: &[Binding] = &[
         keys: &[Key::new(KeyCode::Enter)],
         message: Message::Picker(PickerMsg::Pick),
         description: "connect",
+    },
+];
+
+/// Bindings of the history picker.
+pub const HISTORY_PICKER: &[Binding] = &[
+    Binding {
+        keys: &[Key::char('j'), Key::new(KeyCode::Down)],
+        message: Message::History(HistoryMsg::Next),
+        description: "next",
+    },
+    Binding {
+        keys: &[Key::char('k'), Key::new(KeyCode::Up)],
+        message: Message::History(HistoryMsg::Previous),
+        description: "previous",
+    },
+    Binding {
+        keys: &[Key::new(KeyCode::Enter)],
+        message: Message::History(HistoryMsg::Pick),
+        description: "load",
     },
 ];
 
