@@ -6,6 +6,7 @@ use nespra::{
     error::ParseError,
     search::{Request, parse_timeout},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use thiserror::Error;
 
@@ -14,7 +15,7 @@ use thiserror::Error;
 pub type QueryRequest = Request<Map<String, Value>>;
 
 /// A query: the YQL and the request parameters, as typed by the user.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QueryDraft {
     /// YQL of the query.
     pub yql: String,
@@ -35,6 +36,21 @@ impl QueryDraft {
     pub fn param(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.params.push((name.into(), value.into()));
         self
+    }
+
+    /// The draft as it is sent: the YQL and parameters trimmed, without the parameters
+    /// that have no value.
+    pub fn trimmed(&self) -> QueryDraft {
+        QueryDraft {
+            yql: self.yql.trim().to_string(),
+            params: self
+                .params
+                .iter()
+                .map(|(name, value)| (name.trim(), value.trim()))
+                .filter(|(_, value)| !value.is_empty())
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect(),
+        }
     }
 
     /// Search request of the draft.
@@ -140,6 +156,19 @@ mod test {
 
     fn body(draft: &QueryDraft) -> Value {
         serde_json::to_value(draft.request().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn test_trimmed() {
+        let draft = QueryDraft::new(" select * from doc where true\n")
+            .param("query", "")
+            .param(" hits ", " 5 ")
+            .param("ranking.profile", "  ");
+        assert_eq!(
+            draft.trimmed(),
+            QueryDraft::new("select * from doc where true").param("hits", "5")
+        );
+        assert_eq!(draft.trimmed().request(), draft.request());
     }
 
     #[test]

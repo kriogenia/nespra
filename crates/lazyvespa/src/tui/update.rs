@@ -6,6 +6,7 @@ use super::{
     model::{Notice, Overlay, Pane},
     palette::{self, Command},
     query_editor::{EditorMsg, Focus},
+    saved_picker::SavedChoice,
 };
 
 /// Applies a message to the model. It is the only place where the state changes, and it
@@ -20,7 +21,7 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             }
         }
         Message::ToggleHelp => model.toggle_help(),
-        Message::OpenPalette => model.open_palette(),
+        Message::OpenPalette(input) => model.open_palette(input),
         Message::Palette(message) => {
             let Some(result) = model.palette_mut().and_then(|p| p.update(message)) else {
                 return Vec::new();
@@ -41,6 +42,38 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             };
             model.close_overlay();
             return update(model, Message::SwitchTarget(name));
+        }
+        Message::OpenHistory => model.open_history_picker(),
+        Message::History(message) => {
+            let Some(query) = model.history_picker_mut().and_then(|p| p.update(message)) else {
+                return Vec::new();
+            };
+            model.close_overlay();
+            model.editor_mut().load(&query);
+            model.focus_pane(Pane::Editor);
+            model.set_notice(Notice::Info("Query loaded from the history".to_string()));
+        }
+        Message::OpenSaved => model.open_saved_picker(),
+        Message::Saved(message) => {
+            let Some(choice) = model.saved_picker_mut().and_then(|p| p.update(message)) else {
+                return Vec::new();
+            };
+            match choice {
+                SavedChoice::Load(query) => {
+                    model.close_overlay();
+                    model.editor_mut().load(&query);
+                    model.focus_pane(Pane::Editor);
+                    model.set_notice(Notice::Info("Saved query loaded".to_string()));
+                }
+                SavedChoice::Delete(name) => {
+                    model.set_notice(Notice::Info(format!("Deleted the saved query {name:?}")));
+                    return model
+                        .delete_saved_query(&name)
+                        .map(|(path, queries)| Effect::SaveQueries { path, queries })
+                        .into_iter()
+                        .collect();
+                }
+            }
         }
         Message::SwitchTarget(name) => match model.config().target(&name) {
             Some(target) => {
@@ -72,6 +105,8 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
                 }
             }
         }
+        Message::SaveQuery(name) => return save_query(model, name),
+        Message::NotSaved(error) => model.set_notice(Notice::Error(error)),
         Message::CloseOverlay => model.close_overlay(),
         Message::Quit => model.quit(),
     }
@@ -98,17 +133,44 @@ fn run_query(model: &mut Model) -> Vec<Effect> {
         ));
         return Vec::new();
     };
-    match model.editor().draft().request() {
+    let draft = model.editor().draft();
+    match draft.request() {
         Ok(request) => {
             let id = model.start_search();
             model.set_notice(Notice::Info("Searching…".to_string()));
-            vec![Effect::Search { id, vespa, request }]
+            let save = model
+                .record_query(draft.trimmed())
+                .map(|(path, histories)| Effect::SaveHistory { path, histories });
+            [Effect::Search { id, vespa, request }]
+                .into_iter()
+                .chain(save)
+                .collect()
         }
         Err(error) => {
             model.set_notice(Notice::Error(error.to_string()));
             Vec::new()
         }
     }
+}
+
+/// Saves the query of the editor under the name.
+fn save_query(model: &mut Model, name: String) -> Vec<Effect> {
+    let query = model.editor().draft().trimmed();
+    if query.yql.is_empty() {
+        model.set_notice(Notice::Error("There is no query to save".to_string()));
+        return Vec::new();
+    }
+    let notice = format!("Saved the query as {name:?}");
+    let (replaced, save) = model.save_query(name, query);
+    let notice = if replaced {
+        format!("{notice}, replacing the previous one")
+    } else {
+        notice
+    };
+    model.set_notice(Notice::Info(notice));
+    save.map(|(path, queries)| Effect::SaveQueries { path, queries })
+        .into_iter()
+        .collect()
 }
 
 /// Message running the command of the palette.
@@ -118,6 +180,9 @@ fn command_message(command: Command) -> Message {
         Command::Quit => Message::Quit,
         Command::Context(Some(name)) => Message::SwitchTarget(name),
         Command::Context(None) => Message::OpenTargetPicker,
+        Command::History => Message::OpenHistory,
+        Command::Save(name) => Message::SaveQuery(name),
+        Command::Saved => Message::OpenSaved,
     }
 }
 
@@ -126,6 +191,12 @@ pub(super) fn active_bindings(model: &Model) -> Vec<&'static [Binding]> {
     match model.overlay() {
         Some(Overlay::TargetPicker(_)) => {
             vec![keymap::TARGET_PICKER, keymap::OVERLAY, keymap::GLOBAL]
+        }
+        Some(Overlay::HistoryPicker(_)) => {
+            vec![keymap::HISTORY_PICKER, keymap::OVERLAY, keymap::GLOBAL]
+        }
+        Some(Overlay::SavedPicker(_)) => {
+            vec![keymap::SAVED_PICKER, keymap::OVERLAY, keymap::GLOBAL]
         }
         Some(_) => vec![keymap::OVERLAY, keymap::GLOBAL],
         None if model.pane() == Pane::Results => vec![keymap::RESULTS, keymap::GLOBAL],
@@ -166,7 +237,11 @@ mod test {
     use crate::core::{
         config::{Config, Target},
         connection::ActiveTarget,
+        history::Histories,
+        query::QueryDraft,
+        saved::SavedQueries,
         search::SearchOutcome,
+        store::StoreError,
     };
 
     fn press(model: &mut Model, code: KeyCode) -> Vec<Effect> {
@@ -543,5 +618,242 @@ mod test {
         );
         assert_eq!(model.target().unwrap().name, "local");
         assert_eq!(model.notice(), Some(&Notice::Error("no cert".to_string())));
+    }
+
+    #[test]
+    fn test_run_queries_are_recorded_in_the_history() {
+        let mut model = connected();
+        let _ = update(&mut model, Message::RunQuery);
+        let _ = update(&mut model, Message::RunQuery);
+        let recorded: Vec<_> = model.history().entries().collect();
+        assert_eq!(recorded, [&model.editor().draft().trimmed()]);
+    }
+
+    #[test]
+    fn test_invalid_queries_are_not_recorded() {
+        let mut model = connected();
+        // A parameter with value but without name
+        let _ = press(&mut model, KeyCode::Tab);
+        let _ = type_text(&mut model, "a");
+        let _ = press(&mut model, KeyCode::Tab);
+        let _ = type_text(&mut model, "5");
+        let _ = press(&mut model, KeyCode::Esc);
+        let effects = update(&mut model, Message::RunQuery);
+        assert!(effects.is_empty());
+        assert!(matches!(model.notice(), Some(Notice::Error(_))));
+        assert!(model.history().is_empty());
+    }
+
+    #[test]
+    fn test_the_history_is_saved_after_running() {
+        let mut model = connected().with_history("history.json".into(), Ok(Histories::default()));
+        let effects = update(&mut model, Message::RunQuery);
+        let [
+            Effect::Search { .. },
+            Effect::SaveHistory { path, histories },
+        ] = effects.as_slice()
+        else {
+            panic!("the history must be saved, got {effects:?}");
+        };
+        assert_eq!(path.to_str(), Some("history.json"));
+        assert_eq!(histories.target("local").len(), 1);
+    }
+
+    #[test]
+    fn test_the_history_is_by_target() {
+        let mut histories = Histories::default();
+        histories.record("prod", QueryDraft::new("select * from prod where true"));
+        let mut model = connected().with_history("history.json".into(), Ok(histories));
+        assert!(model.history().is_empty());
+
+        let prod = ActiveTarget::open("prod", Target::self_hosted("http://prod:8080"));
+        let _ = update(
+            &mut model,
+            Message::TargetOpened(Ok(Box::new(prod.unwrap()))),
+        );
+        assert_eq!(model.history().len(), 1);
+    }
+
+    #[test]
+    fn test_an_invalid_history_is_not_saved() {
+        let invalid = serde_json::from_str::<serde_json::Value>("nope").unwrap_err();
+        let error = StoreError::Parse {
+            path: "history.json".into(),
+            source: invalid,
+        };
+        let mut model = connected().with_history("history.json".into(), Err(error));
+        assert!(
+            matches!(model.notice(), Some(Notice::Error(e)) if e.ends_with("will not be saved."))
+        );
+
+        let effects = update(&mut model, Message::RunQuery);
+        assert!(matches!(effects.as_slice(), [Effect::Search { .. }]));
+        assert_eq!(model.history().len(), 1);
+    }
+
+    #[test]
+    fn test_history_not_saved() {
+        let mut model = connected();
+        let _ = update(&mut model, Message::NotSaved("disk full".to_string()));
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Error("disk full".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_load_a_query_from_the_history() {
+        let mut histories = Histories::default();
+        histories.record("local", QueryDraft::new("select * from music where true"));
+        histories.record("local", QueryDraft::new("select * from doc where true"));
+        let mut model = connected().with_history("history.json".into(), Ok(histories));
+        model.focus_pane(Pane::Results);
+
+        let _ = type_text(&mut model, "H");
+        assert!(matches!(model.overlay(), Some(Overlay::HistoryPicker(_))));
+        let _ = type_text(&mut model, "j");
+        let _ = press(&mut model, KeyCode::Enter);
+
+        assert_eq!(model.overlay(), None);
+        assert_eq!(model.editor().yql(), "select * from music where true");
+        assert_eq!(model.pane(), Pane::Editor);
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info("Query loaded from the history".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_history_command() {
+        let mut model = connected();
+        let _ = run_command(&mut model, "history");
+        assert!(matches!(model.overlay(), Some(Overlay::HistoryPicker(_))));
+        // Nothing to load from an empty history
+        let _ = press(&mut model, KeyCode::Enter);
+        assert!(matches!(model.overlay(), Some(Overlay::HistoryPicker(_))));
+    }
+
+    #[test]
+    fn test_h_is_text_while_editing() {
+        let mut model = connected();
+        let _ = press(&mut model, KeyCode::Char('i'));
+        let _ = type_text(&mut model, "H");
+        assert_eq!(model.overlay(), None);
+        assert!(model.editor().yql().ends_with('H'));
+    }
+
+    #[test]
+    fn test_save_the_query() {
+        let mut model =
+            Model::default().with_saved_queries("saved.json".into(), Ok(SavedQueries::default()));
+        let _ = type_text(&mut model, "s");
+        assert!(matches!(model.overlay(), Some(Overlay::Palette(p)) if p.input() == "save "));
+
+        let _ = type_text(&mut model, "all docs");
+        let effects = press(&mut model, KeyCode::Enter);
+
+        let [Effect::SaveQueries { path, queries }] = effects.as_slice() else {
+            panic!("the saved queries must be saved, got {effects:?}");
+        };
+        assert_eq!(path.to_str(), Some("saved.json"));
+        let expected = model.editor().draft().trimmed();
+        assert_eq!(queries.get("all docs"), Some(&expected));
+        assert_eq!(model.saved_queries(), queries);
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info("Saved the query as \"all docs\"".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_save_under_an_existing_name() {
+        let mut model = Model::default();
+        let _ = run_command(&mut model, "save q");
+        let effects = run_command(&mut model, "save q");
+        // Not saved in a file without one
+        assert!(effects.is_empty());
+        assert_eq!(model.saved_queries().len(), 1);
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info(
+                "Saved the query as \"q\", replacing the previous one".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_save_without_name() {
+        let mut model = Model::default();
+        let _ = run_command(&mut model, "save");
+        assert!(model.saved_queries().is_empty());
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Error(
+                "Missing argument, use :save <name>".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_save_an_empty_query() {
+        let mut model = Model::default();
+        model.editor_mut().load(&QueryDraft::new("  "));
+        let _ = run_command(&mut model, "save q");
+        assert!(model.saved_queries().is_empty());
+        assert!(matches!(model.notice(), Some(Notice::Error(_))));
+    }
+
+    fn with_saved(names: &[&str]) -> Model {
+        let mut saved = SavedQueries::default();
+        for name in names {
+            saved.insert(
+                *name,
+                QueryDraft::new(format!("select * from {name} where true")),
+            );
+        }
+        Model::default().with_saved_queries("saved.json".into(), Ok(saved))
+    }
+
+    #[test]
+    fn test_load_a_saved_query() {
+        let mut model = with_saved(&["docs", "music"]);
+        model.focus_pane(Pane::Results);
+        let _ = type_text(&mut model, "S");
+        assert!(matches!(model.overlay(), Some(Overlay::SavedPicker(_))));
+        let _ = type_text(&mut model, "j");
+        let _ = press(&mut model, KeyCode::Enter);
+
+        assert_eq!(model.overlay(), None);
+        assert_eq!(model.editor().yql(), "select * from music where true");
+        assert_eq!(model.pane(), Pane::Editor);
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info("Saved query loaded".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_delete_a_saved_query() {
+        let mut model = with_saved(&["docs", "music"]);
+        let _ = run_command(&mut model, "saved");
+        let effects = type_text(&mut model, "d");
+
+        let [Effect::SaveQueries { queries, .. }] = effects.as_slice() else {
+            panic!("the saved queries must be saved, got {effects:?}");
+        };
+        let names: Vec<_> = queries.iter().map(|(name, _)| name).collect();
+        assert_eq!(names, ["music"]);
+        assert_eq!(model.saved_queries(), queries);
+        // The picker stays open, without the deleted query
+        let Some(Overlay::SavedPicker(picker)) = model.overlay() else {
+            panic!("the picker must stay open");
+        };
+        assert_eq!(picker.selected(), Some("music"));
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info(
+                "Deleted the saved query \"docs\"".to_string()
+            ))
+        );
     }
 }

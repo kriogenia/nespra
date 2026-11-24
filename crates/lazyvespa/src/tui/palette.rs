@@ -31,6 +31,12 @@ pub enum Command {
     Quit,
     /// Connect to the target with this name, or pick one if there is no name.
     Context(Option<String>),
+    /// Pick a query run against the target.
+    History,
+    /// Save the query of the editor under the name.
+    Save(String),
+    /// Pick a saved query.
+    Saved,
 }
 
 /// The typed text is not a valid command.
@@ -39,6 +45,9 @@ pub enum CommandError {
     /// There is no command with this name.
     #[error("Unknown command {0:?}")]
     Unknown(String),
+    /// The command needs an argument, with the usage of the command.
+    #[error("Missing argument, use :{0}")]
+    MissingArgument(&'static str),
 }
 
 impl FromStr for Command {
@@ -48,9 +57,18 @@ impl FromStr for Command {
         let mut words = s.split_whitespace();
         let name = words.next().unwrap_or_default();
         let argument = words.next();
+        let rest = s
+            .trim()
+            .split_once(char::is_whitespace)
+            .map(|(_, rest)| rest.trim());
         match (name, argument) {
+            ("save", _) => rest
+                .map(|name| Command::Save(name.to_string()))
+                .ok_or(CommandError::MissingArgument("save <name>")),
             ("help" | "h" | "?", _) => Ok(Command::Help),
             ("quit" | "q" | "q!", _) => Ok(Command::Quit),
+            ("history" | "hist", _) => Ok(Command::History),
+            ("saved", _) => Ok(Command::Saved),
             ("ctx" | "context", target) => Ok(Command::Context(target.map(str::to_string))),
             _ => Err(CommandError::Unknown(s.trim().to_string())),
         }
@@ -58,6 +76,13 @@ impl FromStr for Command {
 }
 
 impl Palette {
+    /// Palette with the text already typed, like the name of a command.
+    pub fn with_input(input: &str) -> Self {
+        Palette {
+            input: input.to_string(),
+        }
+    }
+
     /// Text typed so far.
     pub fn input(&self) -> &str {
         &self.input
@@ -116,6 +141,14 @@ mod test {
     }
 
     #[test]
+    fn test_save_without_name() {
+        assert_eq!(
+            typed("save  ").update(PaletteMsg::Submit),
+            Some(Err(CommandError::MissingArgument("save <name>")))
+        );
+    }
+
+    #[test]
     fn test_unknown_command() {
         assert_eq!(
             typed("deploy").update(PaletteMsg::Submit),
@@ -136,6 +169,11 @@ mod test {
                 Command::Context(Some("local".to_string())),
             ),
             ("ctx", Command::Context(None)),
+            ("history", Command::History),
+            ("save songs", Command::Save("songs".to_string())),
+            (" save  top songs ", Command::Save("top songs".to_string())),
+            ("hist", Command::History),
+            ("saved", Command::Saved),
         ] {
             assert_eq!(text.parse(), Ok(command));
         }

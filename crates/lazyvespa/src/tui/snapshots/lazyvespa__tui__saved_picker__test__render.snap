@@ -1,0 +1,12 @@
+---
+source: crates/lazyvespa/src/tui/saved_picker.rs
+expression: render(&picker()).backend()
+---
+"                                                                      "
+"                                                                      "
+"    ┌ Saved queries ─────────────────────────────────────────────┐    "
+"    │> all    select * from sources * where true                 │    "
+"    │  docs   select * from doc where true                       │    "
+"    │  songs  select * from music where true hits=5              │    "
+"    └────────────────────────────────────────────────────────────┘    "
+"                                                                      "

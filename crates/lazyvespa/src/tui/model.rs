@@ -1,12 +1,22 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use super::{
+    history_picker::HistoryPicker,
     palette::Palette,
     query_editor::QueryEditor,
     results::{ResultsMsg, ResultsView},
+    saved_picker::SavedPicker,
     target_picker::TargetPicker,
 };
-use crate::core::{config::Config, connection::ActiveTarget, search::SearchOutcome};
+use crate::core::{
+    config::Config,
+    connection::ActiveTarget,
+    history::{Histories, History},
+    query::QueryDraft,
+    saved::SavedQueries,
+    search::SearchOutcome,
+    store::StoreError,
+};
 
 /// State of the whole application.
 #[derive(Debug, Default)]
@@ -21,6 +31,23 @@ pub struct Model {
     searches: u64,
     results: ResultsView,
     pane: Pane,
+    histories: Stored<Histories>,
+    saved: Stored<SavedQueries>,
+}
+
+/// Data kept in a file between runs.
+#[derive(Debug, Default)]
+struct Stored<T> {
+    value: T,
+    /// Where the data is saved, `None` when it is not saved.
+    path: Option<PathBuf>,
+}
+
+impl<T: Clone> Stored<T> {
+    /// The data and where to save it, if it is saved.
+    fn to_save(&self) -> Option<(PathBuf, T)> {
+        Some((self.path.clone()?, self.value.clone()))
+    }
 }
 
 /// Part of the screen receiving the keys.
@@ -65,6 +92,10 @@ pub enum Overlay {
     Palette(Palette),
     /// List of targets to connect to.
     TargetPicker(TargetPicker),
+    /// List of the queries run against the target.
+    HistoryPicker(HistoryPicker),
+    /// List of the saved queries.
+    SavedPicker(SavedPicker),
 }
 
 /// Whether the application keeps running.
@@ -83,6 +114,50 @@ impl Model {
             config,
             target,
             ..Model::default()
+        }
+    }
+
+    /// Uses the histories loaded from the file, saving the new queries in it.
+    ///
+    /// When they could not be loaded, the history starts empty and is not saved, so the
+    /// file is not overwritten, and the error is shown to the user.
+    pub fn with_history(mut self, path: PathBuf, loaded: Result<Histories, StoreError>) -> Self {
+        self.histories = self.stored("history", path, loaded);
+        self
+    }
+
+    /// Uses the saved queries loaded from the file, saving the changes in it.
+    ///
+    /// When they could not be loaded, there are no saved queries and the changes are not
+    /// saved, so the file is not overwritten, and the error is shown to the user.
+    pub fn with_saved_queries(
+        mut self,
+        path: PathBuf,
+        loaded: Result<SavedQueries, StoreError>,
+    ) -> Self {
+        self.saved = self.stored("saved queries", path, loaded);
+        self
+    }
+
+    /// Data loaded from the file, saved in it. When it could not be loaded, it is empty
+    /// and not saved, and the error is shown to the user.
+    fn stored<T: Default>(
+        &mut self,
+        name: &str,
+        path: PathBuf,
+        loaded: Result<T, StoreError>,
+    ) -> Stored<T> {
+        match loaded {
+            Ok(value) => Stored {
+                value,
+                path: Some(path),
+            },
+            Err(error) => {
+                self.notice = Some(Notice::Error(format!(
+                    "{error}. The {name} will not be saved."
+                )));
+                Stored::default()
+            }
         }
     }
 
@@ -181,6 +256,46 @@ impl Model {
         true
     }
 
+    /// History of the queries run against the current target.
+    pub fn history(&self) -> &History {
+        let name = self
+            .target
+            .as_ref()
+            .map_or("", |active| active.name.as_str());
+        self.histories.value.target(name)
+    }
+
+    /// Records a query run against the current target, returning the histories to save
+    /// and where, if they are saved.
+    pub(super) fn record_query(&mut self, query: QueryDraft) -> Option<(PathBuf, Histories)> {
+        let active = self.target.as_ref()?;
+        self.histories.value.record(&active.name, query);
+        self.histories.to_save()
+    }
+
+    /// Queries saved by name.
+    pub fn saved_queries(&self) -> &SavedQueries {
+        &self.saved.value
+    }
+
+    /// Saves a query under the name, returning whether it replaced another one, and the
+    /// saved queries to save and where, if they are saved.
+    pub(super) fn save_query(
+        &mut self,
+        name: String,
+        query: QueryDraft,
+    ) -> (bool, Option<(PathBuf, SavedQueries)>) {
+        let replaced = self.saved.value.insert(name, query).is_some();
+        (replaced, self.saved.to_save())
+    }
+
+    /// Deletes the saved query with the name, returning the saved queries to save and
+    /// where, if they are saved.
+    pub(super) fn delete_saved_query(&mut self, name: &str) -> Option<(PathBuf, SavedQueries)> {
+        self.saved.value.remove(name)?;
+        self.saved.to_save()
+    }
+
     /// Opens the help, or closes it if it is already open.
     pub(super) fn toggle_help(&mut self) {
         self.overlay = match self.overlay {
@@ -189,9 +304,9 @@ impl Model {
         };
     }
 
-    /// Opens an empty command palette.
-    pub(super) fn open_palette(&mut self) {
-        self.overlay = Some(Overlay::Palette(Palette::default()));
+    /// Opens the command palette with the text already typed.
+    pub(super) fn open_palette(&mut self, input: &str) {
+        self.overlay = Some(Overlay::Palette(Palette::with_input(input)));
     }
 
     /// Opens the list of the configured targets.
@@ -199,6 +314,32 @@ impl Model {
         let names = self.config.targets.keys().cloned().collect();
         let current = self.target.as_ref().map(|active| active.name.as_str());
         self.overlay = Some(Overlay::TargetPicker(TargetPicker::new(names, current)));
+    }
+
+    /// Opens the list of the queries run against the target.
+    pub(super) fn open_history_picker(&mut self) {
+        self.overlay = Some(Overlay::HistoryPicker(HistoryPicker::new(self.history())));
+    }
+
+    /// History picker, if it is open.
+    pub(super) fn history_picker_mut(&mut self) -> Option<&mut HistoryPicker> {
+        match &mut self.overlay {
+            Some(Overlay::HistoryPicker(picker)) => Some(picker),
+            _ => None,
+        }
+    }
+
+    /// Opens the list of the saved queries.
+    pub(super) fn open_saved_picker(&mut self) {
+        self.overlay = Some(Overlay::SavedPicker(SavedPicker::new(&self.saved.value)));
+    }
+
+    /// Saved queries picker, if it is open.
+    pub(super) fn saved_picker_mut(&mut self) -> Option<&mut SavedPicker> {
+        match &mut self.overlay {
+            Some(Overlay::SavedPicker(picker)) => Some(picker),
+            _ => None,
+        }
     }
 
     /// Target picker, if it is open.

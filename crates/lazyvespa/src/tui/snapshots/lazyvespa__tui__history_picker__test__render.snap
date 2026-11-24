@@ -1,0 +1,12 @@
+---
+source: crates/lazyvespa/src/tui/history_picker.rs
+expression: render(&picker()).backend()
+---
+"                                                            "
+"                                                            "
+"    ┌ History ─────────────────────────────────────────┐    "
+"    │> select * from music where true hits=5           │    "
+"    │  select * from doc where true                    │    "
+"    └──────────────────────────────────────────────────┘    "
+"                                                            "
+"                                                            "

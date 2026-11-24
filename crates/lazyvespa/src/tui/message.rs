@@ -3,7 +3,8 @@ use std::sync::Arc;
 use crossterm::event::KeyEvent;
 
 use super::{
-    palette::PaletteMsg, query_editor::EditorMsg, results::ResultsMsg, target_picker::PickerMsg,
+    history_picker::HistoryMsg, palette::PaletteMsg, query_editor::EditorMsg, results::ResultsMsg,
+    saved_picker::SavedMsg, target_picker::PickerMsg,
 };
 use crate::core::{connection::ActiveTarget, search::SearchOutcome};
 
@@ -14,8 +15,8 @@ pub enum Message {
     Key(KeyEvent),
     /// Open or close the help.
     ToggleHelp,
-    /// Open the command palette.
-    OpenPalette,
+    /// Open the command palette with the text already typed.
+    OpenPalette(&'static str),
     /// Message of the command palette.
     Palette(PaletteMsg),
     /// Message of the query editor.
@@ -28,6 +29,14 @@ pub enum Message {
     OpenTargetPicker,
     /// Message of the target picker.
     Picker(PickerMsg),
+    /// Open the list of the queries run against the target.
+    OpenHistory,
+    /// Message of the history picker.
+    History(HistoryMsg),
+    /// Open the list of the saved queries.
+    OpenSaved,
+    /// Message of the saved queries picker.
+    Saved(SavedMsg),
     /// Connect to the configured target with this name.
     SwitchTarget(String),
     /// Result of connecting to a target. Boxed as it is much bigger than other messages.
@@ -41,6 +50,10 @@ pub enum Message {
         /// Response, shared as it is not cloneable, or the error.
         result: Result<Arc<SearchOutcome>, String>,
     },
+    /// Save the query of the editor under the name.
+    SaveQuery(String),
+    /// Some data could not be saved in its file, with the reason.
+    NotSaved(String),
     /// Close the open overlay.
     CloseOverlay,
     /// Close the application.

@@ -91,6 +91,21 @@ impl QueryEditor {
         }
     }
 
+    /// Replaces the query of the editor, leaving the edit mode.
+    pub fn load(&mut self, query: &QueryDraft) {
+        self.yql = TextArea::from(query.yql.lines());
+        self.yql.move_cursor(CursorMove::Bottom);
+        self.yql.move_cursor(CursorMove::End);
+        self.params = ParamsForm::with_params(
+            query
+                .params
+                .iter()
+                .map(|(name, value)| (name.as_str(), value.as_str())),
+        );
+        self.focus = Focus::Yql;
+        self.set_editing(false);
+    }
+
     /// Parameters form.
     pub fn params(&self) -> &ParamsForm {
         &self.params
@@ -189,6 +204,22 @@ mod test {
 
     fn key(code: KeyCode) -> EditorMsg {
         EditorMsg::Input(KeyEvent::new(code, KeyModifiers::NONE))
+    }
+
+    #[test]
+    fn test_load_a_query() {
+        let mut editor = QueryEditor::default();
+        editor.update(EditorMsg::Focus(Focus::Params));
+        editor.update(EditorMsg::StartEditing);
+        let query = QueryDraft::new("select *\nfrom music")
+            .param("hits", "5")
+            .param("timeout", "1s");
+
+        editor.load(&query);
+
+        assert_eq!(editor.yql(), "select *\nfrom music");
+        assert_eq!(editor.draft().trimmed(), query);
+        assert_eq!((editor.focus(), editor.is_editing()), (Focus::Yql, false));
     }
 
     #[test]

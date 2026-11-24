@@ -6,7 +6,7 @@ use ratatui::{
 };
 
 use super::{
-    Model, help,
+    Message, Model, help,
     keymap::Binding,
     model::{Notice, Overlay, Pane},
     results, status_bar,
@@ -49,28 +49,64 @@ pub fn view(model: &Model, frame: &mut Frame) {
         (_, Some(Notice::Error(text))) => {
             frame.render_widget(Line::from(format!(" {text}")).red(), footer)
         }
-        _ => frame.render_widget(hints(&active_bindings(model)), footer),
+        _ => frame.render_widget(hints(&active_bindings(model), footer.width), footer),
     }
 
     match model.overlay() {
         Some(Overlay::Help) => help::render(&active_bindings(model), frame, frame.area()),
         Some(Overlay::TargetPicker(picker)) => picker.render(frame, main),
+        Some(Overlay::HistoryPicker(picker)) => picker.render(frame, main),
+        Some(Overlay::SavedPicker(picker)) => picker.render(frame, main),
         _ => {}
     }
 }
 
-/// Suggested key of each active binding.
-fn hints(groups: &[&[Binding]]) -> Line<'static> {
-    let hints = groups
+/// Separator between the hints of the footer.
+const SEPARATOR: &str = " · ";
+
+/// Suggested key of the active bindings, the most specific first, as many as fit in the
+/// width. When some are left out, the last hint is the help, which lists all of them.
+fn hints(groups: &[&[Binding]], width: u16) -> Line<'static> {
+    let bindings: Vec<&Binding> = groups.iter().flat_map(|bindings| bindings.iter()).collect();
+    let all: Vec<String> = bindings
         .iter()
-        .flat_map(|bindings| bindings.iter())
-        .filter_map(|binding| {
-            let key = binding.keys.first()?;
-            Some(format!("{key} {}", binding.description))
-        })
-        .collect::<Vec<_>>()
-        .join(" · ");
-    Line::from(format!(" {hints}")).dim()
+        .filter_map(|binding| hint(binding))
+        .collect();
+    let available = usize::from(width).saturating_sub(1);
+    if all.join(SEPARATOR).chars().count() <= available {
+        return hints_line(&all);
+    }
+
+    let help = bindings
+        .iter()
+        .find(|binding| matches!(binding.message, Message::ToggleHelp))
+        .and_then(|binding| hint(binding));
+    let separator = SEPARATOR.chars().count();
+    let reserved = help
+        .as_ref()
+        .map_or(0, |help| separator + help.chars().count());
+    let mut shown = Vec::new();
+    let mut used = 0;
+    for hint in all.into_iter().filter(|hint| Some(hint) != help.as_ref()) {
+        let needed = hint.chars().count() + if shown.is_empty() { 0 } else { separator };
+        if used + needed + reserved > available {
+            break;
+        }
+        used += needed;
+        shown.push(hint);
+    }
+    shown.extend(help);
+    hints_line(&shown)
+}
+
+/// Hint of a binding: its suggested key and what it does.
+fn hint(binding: &Binding) -> Option<String> {
+    let key = binding.keys.first()?;
+    Some(format!("{key} {}", binding.description))
+}
+
+fn hints_line(hints: &[String]) -> Line<'static> {
+    Line::from(format!(" {}", hints.join(SEPARATOR))).dim()
 }
 
 #[cfg(test)]
@@ -108,7 +144,7 @@ mod test {
     #[test]
     fn test_view_with_palette() {
         let mut model = Model::default();
-        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenPalette);
+        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenPalette(""));
         for c in "ctx".chars() {
             let message = crate::tui::palette::PaletteMsg::Insert(c);
             let _ = crate::tui::update(&mut model, crate::tui::Message::Palette(message));
@@ -172,6 +208,51 @@ mod test {
             Config::default(),
             Some(ActiveTarget::open("prod", target).unwrap()),
         );
+        assert_snapshot!(render(&model).backend());
+    }
+
+    #[test]
+    fn test_view_with_history_picker() {
+        let mut histories = crate::core::history::Histories::default();
+        for yql in [
+            "select * from doc where true",
+            "select * from music where true",
+        ] {
+            histories.record("local", crate::core::query::QueryDraft::new(yql));
+        }
+        let target = ActiveTarget::open("local", Target::self_hosted("http://localhost:8080"));
+        let mut model = Model::new(Config::default(), Some(target.unwrap()))
+            .with_history("history.json".into(), Ok(histories));
+        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenHistory);
+        assert_snapshot!(render(&model).backend());
+    }
+
+    #[test]
+    fn test_hints_that_fit() {
+        let line = hints(&[crate::tui::keymap::GLOBAL], 200);
+        assert_eq!(
+            line.to_string(),
+            " Ctrl+R run · : command · T targets · H history · s save · S saved · ? help · q quit"
+        );
+    }
+
+    #[test]
+    fn test_hints_end_with_the_help_when_they_do_not_fit() {
+        let groups = [crate::tui::keymap::RESULTS, crate::tui::keymap::GLOBAL];
+        let line = hints(&groups, 40);
+        assert_eq!(line.to_string(), " j next · k previous · ? help");
+        assert!(hints(&groups, 10).to_string().ends_with("? help"));
+    }
+
+    #[test]
+    fn test_view_with_saved_picker() {
+        let mut saved = crate::core::saved::SavedQueries::default();
+        saved.insert(
+            "docs",
+            crate::core::query::QueryDraft::new("select * from doc where true"),
+        );
+        let mut model = Model::default().with_saved_queries("saved.json".into(), Ok(saved));
+        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenSaved);
         assert_snapshot!(render(&model).backend());
     }
 }
