@@ -4,7 +4,7 @@ use crossterm::event::KeyEvent;
 
 use super::{
     history_picker::HistoryMsg, palette::PaletteMsg, query_editor::EditorMsg, results::ResultsMsg,
-    target_picker::PickerMsg,
+    saved_picker::SavedMsg, target_picker::PickerMsg,
 };
 use crate::core::{connection::ActiveTarget, search::SearchOutcome};
 
@@ -33,6 +33,10 @@ pub enum Message {
     OpenHistory,
     /// Message of the history picker.
     History(HistoryMsg),
+    /// Open the list of the saved queries.
+    OpenSaved,
+    /// Message of the saved queries picker.
+    Saved(SavedMsg),
     /// Connect to the configured target with this name.
     SwitchTarget(String),
     /// Result of connecting to a target. Boxed as it is much bigger than other messages.

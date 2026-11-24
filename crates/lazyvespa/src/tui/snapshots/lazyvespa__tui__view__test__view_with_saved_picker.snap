@@ -1,0 +1,16 @@
+---
+source: crates/lazyvespa/src/tui/view.rs
+expression: render(&model).backend()
+---
+" lazyvespa  no target, use --url or --target                                              "
+"┌ Query ─────────────────────────────────────────┐┌ Parameters ──────────────────────────┐"
+"│select * from sources * where true              ││query                                 │"
+"│                                                ││hits                                  │"
+"│                                                ││ranking.profile                       │"
+"│   ┌ Saved queries ─────────────────────────────────────────────────────────────────┐   │"
+"│   │> docs  select * from doc where true                                            │   │"
+"│   └────────────────────────────────────────────────────────────────────────────────┘   │"
+"└────────────────────────────────────────────────┘└──────────────────────────────────────┘"
+"┌ Results ───────────────────────────────────────────────────────────────────────────────┐"
+"└────────────────────────────────────────────────────────────────────────────────────────┘"
+" j next · k previous · Enter load · d delete · Esc close · Ctrl+R run · : command · ? help"

@@ -7,7 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{
     Message, history_picker::HistoryMsg, params_form::ParamsMsg, query_editor::EditorMsg,
-    results::ResultsMsg, target_picker::PickerMsg,
+    results::ResultsMsg, saved_picker::SavedMsg, target_picker::PickerMsg,
 };
 
 /// A key, optionally pressed together with modifiers.
@@ -107,6 +107,11 @@ pub const GLOBAL: &[Binding] = &[
         keys: &[Key::char('s')],
         message: Message::OpenPalette("save "),
         description: "save",
+    },
+    Binding {
+        keys: &[Key::char('S')],
+        message: Message::OpenSaved,
+        description: "saved",
     },
     Binding {
         keys: &[Key::char('?')],
@@ -270,6 +275,30 @@ pub const HISTORY_PICKER: &[Binding] = &[
         keys: &[Key::new(KeyCode::Enter)],
         message: Message::History(HistoryMsg::Pick),
         description: "load",
+    },
+];
+
+/// Bindings of the saved queries picker.
+pub const SAVED_PICKER: &[Binding] = &[
+    Binding {
+        keys: &[Key::char('j'), Key::new(KeyCode::Down)],
+        message: Message::Saved(SavedMsg::Next),
+        description: "next",
+    },
+    Binding {
+        keys: &[Key::char('k'), Key::new(KeyCode::Up)],
+        message: Message::Saved(SavedMsg::Previous),
+        description: "previous",
+    },
+    Binding {
+        keys: &[Key::new(KeyCode::Enter)],
+        message: Message::Saved(SavedMsg::Pick),
+        description: "load",
+    },
+    Binding {
+        keys: &[Key::char('d')],
+        message: Message::Saved(SavedMsg::Delete),
+        description: "delete",
     },
 ];
 

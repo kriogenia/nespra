@@ -1,0 +1,12 @@
+---
+source: crates/lazyvespa/src/tui/saved_picker.rs
+expression: "render(&SavedPicker::default()).backend()"
+---
+"                                                                      "
+"                                                                      "
+"                                                                      "
+"    ┌ Saved queries ─────────────────────────────────────────────┐    "
+"    │ No saved queries, press s to save one                      │    "
+"    └────────────────────────────────────────────────────────────┘    "
+"                                                                      "
+"                                                                      "

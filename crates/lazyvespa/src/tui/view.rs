@@ -56,6 +56,7 @@ pub fn view(model: &Model, frame: &mut Frame) {
         Some(Overlay::Help) => help::render(&active_bindings(model), frame, frame.area()),
         Some(Overlay::TargetPicker(picker)) => picker.render(frame, main),
         Some(Overlay::HistoryPicker(picker)) => picker.render(frame, main),
+        Some(Overlay::SavedPicker(picker)) => picker.render(frame, main),
         _ => {}
     }
 }
@@ -231,7 +232,7 @@ mod test {
         let line = hints(&[crate::tui::keymap::GLOBAL], 200);
         assert_eq!(
             line.to_string(),
-            " Ctrl+R run · : command · T targets · H history · s save · ? help · q quit"
+            " Ctrl+R run · : command · T targets · H history · s save · S saved · ? help · q quit"
         );
     }
 
@@ -241,5 +242,17 @@ mod test {
         let line = hints(&groups, 40);
         assert_eq!(line.to_string(), " j next · k previous · ? help");
         assert!(hints(&groups, 10).to_string().ends_with("? help"));
+    }
+
+    #[test]
+    fn test_view_with_saved_picker() {
+        let mut saved = crate::core::saved::SavedQueries::default();
+        saved.insert(
+            "docs",
+            crate::core::query::QueryDraft::new("select * from doc where true"),
+        );
+        let mut model = Model::default().with_saved_queries("saved.json".into(), Ok(saved));
+        let _ = crate::tui::update(&mut model, crate::tui::Message::OpenSaved);
+        assert_snapshot!(render(&model).backend());
     }
 }

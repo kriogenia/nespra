@@ -5,6 +5,7 @@ use super::{
     palette::Palette,
     query_editor::QueryEditor,
     results::{ResultsMsg, ResultsView},
+    saved_picker::SavedPicker,
     target_picker::TargetPicker,
 };
 use crate::core::{
@@ -93,6 +94,8 @@ pub enum Overlay {
     TargetPicker(TargetPicker),
     /// List of the queries run against the target.
     HistoryPicker(HistoryPicker),
+    /// List of the saved queries.
+    SavedPicker(SavedPicker),
 }
 
 /// Whether the application keeps running.
@@ -286,6 +289,13 @@ impl Model {
         (replaced, self.saved.to_save())
     }
 
+    /// Deletes the saved query with the name, returning the saved queries to save and
+    /// where, if they are saved.
+    pub(super) fn delete_saved_query(&mut self, name: &str) -> Option<(PathBuf, SavedQueries)> {
+        self.saved.value.remove(name)?;
+        self.saved.to_save()
+    }
+
     /// Opens the help, or closes it if it is already open.
     pub(super) fn toggle_help(&mut self) {
         self.overlay = match self.overlay {
@@ -315,6 +325,19 @@ impl Model {
     pub(super) fn history_picker_mut(&mut self) -> Option<&mut HistoryPicker> {
         match &mut self.overlay {
             Some(Overlay::HistoryPicker(picker)) => Some(picker),
+            _ => None,
+        }
+    }
+
+    /// Opens the list of the saved queries.
+    pub(super) fn open_saved_picker(&mut self) {
+        self.overlay = Some(Overlay::SavedPicker(SavedPicker::new(&self.saved.value)));
+    }
+
+    /// Saved queries picker, if it is open.
+    pub(super) fn saved_picker_mut(&mut self) -> Option<&mut SavedPicker> {
+        match &mut self.overlay {
+            Some(Overlay::SavedPicker(picker)) => Some(picker),
             _ => None,
         }
     }

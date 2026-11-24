@@ -80,7 +80,7 @@ impl HistoryPicker {
 }
 
 /// The query in one line: the YQL, and its parameters dimmed.
-fn summary(query: &QueryDraft) -> Line<'_> {
+pub(super) fn summary(query: &QueryDraft) -> Line<'_> {
     let yql = query.yql.split_whitespace().collect::<Vec<_>>().join(" ");
     let params = query
         .params

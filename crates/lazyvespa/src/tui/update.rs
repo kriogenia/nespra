@@ -6,6 +6,7 @@ use super::{
     model::{Notice, Overlay, Pane},
     palette::{self, Command},
     query_editor::{EditorMsg, Focus},
+    saved_picker::SavedChoice,
 };
 
 /// Applies a message to the model. It is the only place where the state changes, and it
@@ -51,6 +52,28 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             model.editor_mut().load(&query);
             model.focus_pane(Pane::Editor);
             model.set_notice(Notice::Info("Query loaded from the history".to_string()));
+        }
+        Message::OpenSaved => model.open_saved_picker(),
+        Message::Saved(message) => {
+            let Some(choice) = model.saved_picker_mut().and_then(|p| p.update(message)) else {
+                return Vec::new();
+            };
+            match choice {
+                SavedChoice::Load(query) => {
+                    model.close_overlay();
+                    model.editor_mut().load(&query);
+                    model.focus_pane(Pane::Editor);
+                    model.set_notice(Notice::Info("Saved query loaded".to_string()));
+                }
+                SavedChoice::Delete(name) => {
+                    model.set_notice(Notice::Info(format!("Deleted the saved query {name:?}")));
+                    return model
+                        .delete_saved_query(&name)
+                        .map(|(path, queries)| Effect::SaveQueries { path, queries })
+                        .into_iter()
+                        .collect();
+                }
+            }
         }
         Message::SwitchTarget(name) => match model.config().target(&name) {
             Some(target) => {
@@ -159,6 +182,7 @@ fn command_message(command: Command) -> Message {
         Command::Context(None) => Message::OpenTargetPicker,
         Command::History => Message::OpenHistory,
         Command::Save(name) => Message::SaveQuery(name),
+        Command::Saved => Message::OpenSaved,
     }
 }
 
@@ -170,6 +194,9 @@ pub(super) fn active_bindings(model: &Model) -> Vec<&'static [Binding]> {
         }
         Some(Overlay::HistoryPicker(_)) => {
             vec![keymap::HISTORY_PICKER, keymap::OVERLAY, keymap::GLOBAL]
+        }
+        Some(Overlay::SavedPicker(_)) => {
+            vec![keymap::SAVED_PICKER, keymap::OVERLAY, keymap::GLOBAL]
         }
         Some(_) => vec![keymap::OVERLAY, keymap::GLOBAL],
         None if model.pane() == Pane::Results => vec![keymap::RESULTS, keymap::GLOBAL],
@@ -774,5 +801,59 @@ mod test {
         let _ = run_command(&mut model, "save q");
         assert!(model.saved_queries().is_empty());
         assert!(matches!(model.notice(), Some(Notice::Error(_))));
+    }
+
+    fn with_saved(names: &[&str]) -> Model {
+        let mut saved = SavedQueries::default();
+        for name in names {
+            saved.insert(
+                *name,
+                QueryDraft::new(format!("select * from {name} where true")),
+            );
+        }
+        Model::default().with_saved_queries("saved.json".into(), Ok(saved))
+    }
+
+    #[test]
+    fn test_load_a_saved_query() {
+        let mut model = with_saved(&["docs", "music"]);
+        model.focus_pane(Pane::Results);
+        let _ = type_text(&mut model, "S");
+        assert!(matches!(model.overlay(), Some(Overlay::SavedPicker(_))));
+        let _ = type_text(&mut model, "j");
+        let _ = press(&mut model, KeyCode::Enter);
+
+        assert_eq!(model.overlay(), None);
+        assert_eq!(model.editor().yql(), "select * from music where true");
+        assert_eq!(model.pane(), Pane::Editor);
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info("Saved query loaded".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_delete_a_saved_query() {
+        let mut model = with_saved(&["docs", "music"]);
+        let _ = run_command(&mut model, "saved");
+        let effects = type_text(&mut model, "d");
+
+        let [Effect::SaveQueries { queries, .. }] = effects.as_slice() else {
+            panic!("the saved queries must be saved, got {effects:?}");
+        };
+        let names: Vec<_> = queries.iter().map(|(name, _)| name).collect();
+        assert_eq!(names, ["music"]);
+        assert_eq!(model.saved_queries(), queries);
+        // The picker stays open, without the deleted query
+        let Some(Overlay::SavedPicker(picker)) = model.overlay() else {
+            panic!("the picker must stay open");
+        };
+        assert_eq!(picker.selected(), Some("music"));
+        assert_eq!(
+            model.notice(),
+            Some(&Notice::Info(
+                "Deleted the saved query \"docs\"".to_string()
+            ))
+        );
     }
 }
