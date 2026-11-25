@@ -22,7 +22,7 @@ pub fn view(model: &Model, frame: &mut Frame) {
     ])
     .areas(frame.area());
 
-    status_bar::render(model.target(), frame, header);
+    status_bar::render(model.target(), model.health(), frame, header);
     let [editor, results] =
         Layout::vertical([Constraint::Length(8), Constraint::Fill(1)]).areas(main);
     let pane = model.pane();

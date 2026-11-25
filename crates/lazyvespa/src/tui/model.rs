@@ -1,5 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
+use nespra::admin::Admin;
+
 use super::{
     history_picker::HistoryPicker,
     palette::Palette,
@@ -11,6 +13,7 @@ use super::{
 use crate::core::{
     config::Config,
     connection::ActiveTarget,
+    health::HealthCheck,
     history::{Histories, History},
     query::QueryDraft,
     saved::SavedQueries,
@@ -33,6 +36,18 @@ pub struct Model {
     pane: Pane,
     histories: Stored<Histories>,
     saved: Stored<SavedQueries>,
+    health: HealthMonitor,
+}
+
+/// Health checks of the target.
+#[derive(Debug, Default)]
+struct HealthMonitor {
+    /// Number of checks started, used as the identifier of the last one.
+    checks: u64,
+    /// Identifier of the check waiting for an answer, if any.
+    pending: Option<u64>,
+    /// Result of the last check of the target, `None` before the first answer.
+    last: Option<Result<HealthCheck, String>>,
 }
 
 /// Data kept in a file between runs.
@@ -201,6 +216,35 @@ impl Model {
         self.target = Some(target);
         self.search = SearchState::Idle;
         self.results = ResultsView::default();
+        // The answer of a pending check is about the previous target, so it is ignored
+        self.health.pending = None;
+        self.health.last = None;
+    }
+
+    /// Result of the last health check of the target, `None` before the first answer.
+    pub fn health(&self) -> Option<&Result<HealthCheck, String>> {
+        self.health.last.as_ref()
+    }
+
+    /// Starts a health check of the target, returning its identifier and the client to
+    /// run it. Nothing is started without a target or while a check is waiting for its
+    /// answer, so a slow target is not flooded with checks.
+    pub(super) fn start_health_check(&mut self) -> Option<(u64, Admin)> {
+        let admin = self.target.as_ref()?.connection.admin.clone();
+        if self.health.pending.is_some() {
+            return None;
+        }
+        self.health.checks += 1;
+        self.health.pending = Some(self.health.checks);
+        Some((self.health.checks, admin))
+    }
+
+    /// Stores the result of the health check if it is the pending one.
+    pub(super) fn finish_health_check(&mut self, id: u64, result: Result<HealthCheck, String>) {
+        if self.health.pending == Some(id) {
+            self.health.pending = None;
+            self.health.last = Some(result);
+        }
     }
 
     /// Part of the screen receiving the keys.

@@ -6,7 +6,7 @@ use super::{
     history_picker::HistoryMsg, palette::PaletteMsg, query_editor::EditorMsg, results::ResultsMsg,
     saved_picker::SavedMsg, target_picker::PickerMsg,
 };
-use crate::core::{connection::ActiveTarget, search::SearchOutcome};
+use crate::core::{connection::ActiveTarget, health::HealthCheck, search::SearchOutcome};
 
 /// Something that happened and the application reacts to.
 #[derive(Debug, Clone)]
@@ -49,6 +49,15 @@ pub enum Message {
         id: u64,
         /// Response, shared as it is not cloneable, or the error.
         result: Result<Arc<SearchOutcome>, String>,
+    },
+    /// Time to do the periodic work, like checking the health of the target.
+    Tick,
+    /// Result of a health check of the target.
+    HealthChecked {
+        /// Identifier of the check.
+        id: u64,
+        /// Health of the target, or why it could not be checked.
+        result: Result<HealthCheck, String>,
     },
     /// Save the query of the editor under the name.
     SaveQuery(String),

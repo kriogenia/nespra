@@ -1,10 +1,13 @@
-//! Sources of [`Message`]s: the terminal and the results of the effects.
+//! Sources of [`Message`]s: the terminal, the results of the effects and a periodic tick.
 
-use std::io;
+use std::{io, time::Duration};
 
 use crossterm::event::{Event, EventStream, KeyEventKind};
 use futures::StreamExt;
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::{
+    sync::mpsc::UnboundedReceiver,
+    time::{Interval, MissedTickBehavior},
+};
 
 use super::Message;
 
@@ -12,14 +15,20 @@ use super::Message;
 pub(super) struct Events {
     terminal: EventStream,
     effects: UnboundedReceiver<Message>,
+    ticks: Interval,
 }
 
 impl Events {
-    /// Listens to the terminal and to the messages sent by the effects.
-    pub(super) fn new(effects: UnboundedReceiver<Message>) -> Self {
+    /// Listens to the terminal and to the messages sent by the effects, and sends a
+    /// [`Message::Tick`] every period, starting right away.
+    pub(super) fn new(effects: UnboundedReceiver<Message>, period: Duration) -> Self {
+        let mut ticks = tokio::time::interval(period);
+        // Ticks missed while the application was busy are not worth catching up
+        ticks.set_missed_tick_behavior(MissedTickBehavior::Delay);
         Self {
             terminal: EventStream::new(),
             effects,
+            ticks,
         }
     }
 
@@ -35,6 +44,7 @@ impl Events {
             },
             // The sender lives in the effect runner as long as the application runs
             Some(message) = self.effects.recv() => Ok(Some(message)),
+            _ = self.ticks.tick() => Ok(Some(Message::Tick)),
         }
     }
 }

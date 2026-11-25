@@ -2,7 +2,7 @@
 source: crates/lazyvespa/src/tui/view.rs
 expression: render(&model).backend()
 ---
-" lazyvespa  prod  cloud acme.search.default  https://abc.vespa-app.cloud                  "
+" lazyvespa  prod  cloud acme.search.default  https://abc.vespa-app.cloud       ● checking "
 "┌ Query ─────────────────────────────────────────┐┌ Parameters ──────────────────────────┐"
 "│select * from sources * where true              ││query                                 │"
 "│                                                ││hits                                  │"
