@@ -2,7 +2,9 @@
 
 use std::time::{Duration, Instant};
 
-use nespra::admin::{Admin, error::AdminError, state::HealthCode};
+use jiff::Timestamp;
+
+use nespra::admin::{Admin, application::ApplicationStatus, error::AdminError, state::HealthCode};
 
 /// Health reported by a target, with how long it took to answer.
 #[derive(Debug, Clone, PartialEq)]
@@ -30,6 +32,42 @@ pub async fn check(admin: &Admin) -> Result<HealthCheck, AdminError> {
     })
 }
 
+/// Deployment of the application running in the target.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Deployment {
+    /// Vespa version running in the target.
+    pub vespa_version: String,
+    /// Name of the application.
+    pub application: Option<String>,
+    /// Config generation, increased on each deployment.
+    pub generation: Option<u64>,
+    /// When the application was deployed, `None` if it is not reported or not valid.
+    pub deployed_at: Option<Timestamp>,
+}
+
+impl From<ApplicationStatus> for Deployment {
+    fn from(status: ApplicationStatus) -> Self {
+        Deployment {
+            vespa_version: status.vespa_version,
+            application: status.name,
+            generation: status.generation,
+            deployed_at: status
+                .deployed_at
+                .and_then(|millis| i64::try_from(millis).ok())
+                .and_then(|millis| Timestamp::from_millisecond(millis).ok()),
+        }
+    }
+}
+
+/// Gets the deployment of the application running in the target.
+///
+/// # Errors
+///
+/// Same as [`Admin::application_status`].
+pub async fn deployment(admin: &Admin) -> Result<Deployment, AdminError> {
+    admin.application_status().await.map(Deployment::from)
+}
+
 #[cfg(test)]
 mod test {
     use serde_json::json;
@@ -40,14 +78,40 @@ mod test {
 
     use super::*;
 
-    async fn check_answer(response: ResponseTemplate) -> Result<HealthCheck, AdminError> {
+    async fn admin(endpoint: &str, response: ResponseTemplate) -> (MockServer, Admin) {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
-            .and(path("/state/v1/health"))
+            .and(path(endpoint))
             .respond_with(response)
             .mount(&server)
             .await;
-        check(&Admin::new(server.uri()).unwrap()).await
+        let admin = Admin::new(server.uri()).unwrap();
+        (server, admin)
+    }
+
+    async fn check_answer(response: ResponseTemplate) -> Result<HealthCheck, AdminError> {
+        let (_server, admin) = admin("/state/v1/health", response).await;
+        check(&admin).await
+    }
+
+    #[tokio::test]
+    async fn test_deployment() {
+        let response = ResponseTemplate::new(200).set_body_json(json!({
+            "application": {
+                "vespa": {"version": "8.512.1"},
+                "meta": {"name": "default", "generation": 2, "timestamp": 1795627162436_u64}
+            }
+        }));
+        let (_server, admin) = admin("/ApplicationStatus", response).await;
+        assert_eq!(
+            deployment(&admin).await.unwrap(),
+            Deployment {
+                vespa_version: "8.512.1".to_string(),
+                application: Some("default".to_string()),
+                generation: Some(2),
+                deployed_at: Some("2026-11-25T17:19:22.436Z".parse().unwrap()),
+            }
+        );
     }
 
     #[tokio::test]
