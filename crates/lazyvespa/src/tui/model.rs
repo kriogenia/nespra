@@ -13,7 +13,7 @@ use super::{
 use crate::core::{
     config::Config,
     connection::ActiveTarget,
-    health::HealthCheck,
+    health::{Deployment, HealthCheck},
     history::{Histories, History},
     query::QueryDraft,
     saved::SavedQueries,
@@ -36,18 +36,57 @@ pub struct Model {
     pane: Pane,
     histories: Stored<Histories>,
     saved: Stored<SavedQueries>,
-    health: HealthMonitor,
+    health: Fetched<HealthCheck>,
+    deployment: Fetched<Deployment>,
 }
 
-/// Health checks of the target.
-#[derive(Debug, Default)]
-struct HealthMonitor {
-    /// Number of checks started, used as the identifier of the last one.
-    checks: u64,
-    /// Identifier of the check waiting for an answer, if any.
+/// Data requested to the target in the background, one request at a time.
+#[derive(Debug)]
+struct Fetched<T> {
+    /// Number of requests started, used as the identifier of the last one.
+    requests: u64,
+    /// Identifier of the request waiting for an answer, if any.
     pending: Option<u64>,
-    /// Result of the last check of the target, `None` before the first answer.
-    last: Option<Result<HealthCheck, String>>,
+    /// Result of the last request, `None` before the first answer.
+    last: Option<Result<T, String>>,
+}
+
+impl<T> Default for Fetched<T> {
+    fn default() -> Self {
+        Fetched {
+            requests: 0,
+            pending: None,
+            last: None,
+        }
+    }
+}
+
+impl<T> Fetched<T> {
+    /// Starts a request, returning its identifier, unless one is waiting for its answer.
+    fn start(&mut self) -> Option<u64> {
+        if self.pending.is_some() {
+            return None;
+        }
+        self.requests += 1;
+        self.pending = Some(self.requests);
+        Some(self.requests)
+    }
+
+    /// Stores the result of the request if it is the pending one, returning whether it was.
+    fn finish(&mut self, id: u64, result: Result<T, String>) -> bool {
+        if self.pending != Some(id) {
+            return false;
+        }
+        self.pending = None;
+        self.last = Some(result);
+        true
+    }
+
+    /// Forgets the last result, ignoring the answer of the pending request.
+    fn reset(&mut self) {
+        self.pending = None;
+        self.last = None;
+    }
 }
 
 /// Data kept in a file between runs.
@@ -111,6 +150,8 @@ pub enum Overlay {
     HistoryPicker(HistoryPicker),
     /// List of the saved queries.
     SavedPicker(SavedPicker),
+    /// Information about the target: its health and deployment.
+    Info,
 }
 
 /// Whether the application keeps running.
@@ -216,9 +257,9 @@ impl Model {
         self.target = Some(target);
         self.search = SearchState::Idle;
         self.results = ResultsView::default();
-        // The answer of a pending check is about the previous target, so it is ignored
-        self.health.pending = None;
-        self.health.last = None;
+        // The answers of the pending requests are about the previous target
+        self.health.reset();
+        self.deployment.reset();
     }
 
     /// Result of the last health check of the target, `None` before the first answer.
@@ -226,25 +267,45 @@ impl Model {
         self.health.last.as_ref()
     }
 
+    /// Whether the last health check found the target up.
+    pub fn is_up(&self) -> bool {
+        matches!(self.health(), Some(Ok(check)) if check.code.is_up())
+    }
+
     /// Starts a health check of the target, returning its identifier and the client to
     /// run it. Nothing is started without a target or while a check is waiting for its
     /// answer, so a slow target is not flooded with checks.
     pub(super) fn start_health_check(&mut self) -> Option<(u64, Admin)> {
         let admin = self.target.as_ref()?.connection.admin.clone();
-        if self.health.pending.is_some() {
-            return None;
-        }
-        self.health.checks += 1;
-        self.health.pending = Some(self.health.checks);
-        Some((self.health.checks, admin))
+        Some((self.health.start()?, admin))
     }
 
     /// Stores the result of the health check if it is the pending one.
     pub(super) fn finish_health_check(&mut self, id: u64, result: Result<HealthCheck, String>) {
-        if self.health.pending == Some(id) {
-            self.health.pending = None;
-            self.health.last = Some(result);
-        }
+        self.health.finish(id, result);
+    }
+
+    /// Status of the application of the target from its last request, `None` before the
+    /// first answer.
+    pub fn deployment(&self) -> Option<&Result<Deployment, String>> {
+        self.deployment.last.as_ref()
+    }
+
+    /// Whether the status of the application is being requested.
+    pub fn is_fetching_deployment(&self) -> bool {
+        self.deployment.pending.is_some()
+    }
+
+    /// Starts a request of the status of the application, like
+    /// [`start_health_check`](Self::start_health_check).
+    pub(super) fn start_deployment_fetch(&mut self) -> Option<(u64, Admin)> {
+        let admin = self.target.as_ref()?.connection.admin.clone();
+        Some((self.deployment.start()?, admin))
+    }
+
+    /// Stores the status of the application if it answers the pending request.
+    pub(super) fn finish_deployment_fetch(&mut self, id: u64, result: Result<Deployment, String>) {
+        self.deployment.finish(id, result);
     }
 
     /// Part of the screen receiving the keys.
@@ -371,6 +432,11 @@ impl Model {
             Some(Overlay::HistoryPicker(picker)) => Some(picker),
             _ => None,
         }
+    }
+
+    /// Opens the panel with information about the target.
+    pub(super) fn open_info_panel(&mut self) {
+        self.overlay = Some(Overlay::Info);
     }
 
     /// Opens the list of the saved queries.

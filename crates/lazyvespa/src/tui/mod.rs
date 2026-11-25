@@ -4,6 +4,7 @@ mod effect;
 mod event;
 mod help;
 mod history_picker;
+mod info_panel;
 mod keymap;
 mod message;
 mod model;

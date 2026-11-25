@@ -37,6 +37,8 @@ pub enum Command {
     Save(String),
     /// Pick a saved query.
     Saved,
+    /// Show information about the target: its health and deployment.
+    Info,
 }
 
 /// The typed text is not a valid command.
@@ -69,6 +71,7 @@ impl FromStr for Command {
             ("quit" | "q" | "q!", _) => Ok(Command::Quit),
             ("history" | "hist", _) => Ok(Command::History),
             ("saved", _) => Ok(Command::Saved),
+            ("info", _) => Ok(Command::Info),
             ("ctx" | "context", target) => Ok(Command::Context(target.map(str::to_string))),
             _ => Err(CommandError::Unknown(s.trim().to_string())),
         }
@@ -174,6 +177,7 @@ mod test {
             (" save  top songs ", Command::Save("top songs".to_string())),
             ("hist", Command::History),
             ("saved", Command::Saved),
+            ("info", Command::Info),
         ] {
             assert_eq!(text.parse(), Ok(command));
         }

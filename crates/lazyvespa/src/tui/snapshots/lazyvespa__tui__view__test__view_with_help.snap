@@ -2,15 +2,15 @@
 source: crates/lazyvespa/src/tui/view.rs
 expression: render(&model).backend()
 ---
-" lazyvespa  no target, use --url or --target                                              "
-"┌ Query ───────────────────┌ Keys ────────────────────────────┐──────────────────────────┐"
-"│select * from sources * wh│       Esc  close                 │                          │"
-"│                          │Ctrl+R, F5  run                   │                          │"
-"│                          │         :  command               │ile                       │"
-"│                          │         T  targets               │                          │"
+" lazyvespa  no target, use ┌ Keys ────────────────────────────┐                           "
+"┌ Query ───────────────────│       Esc  close                 │──────────────────────────┐"
+"│select * from sources * wh│Ctrl+R, F5  run                   │                          │"
+"│                          │         :  command               │                          │"
+"│                          │         T  targets               │ile                       │"
 "│                          │         H  history               │                          │"
 "│                          │         s  save                  │                          │"
-"└──────────────────────────│         S  saved                 │──────────────────────────┘"
+"│                          │         S  saved                 │                          │"
+"└──────────────────────────│         I  info                  │──────────────────────────┘"
 "┌ Results ─────────────────│         ?  help                  │──────────────────────────┐"
 "└──────────────────────────│ q, Ctrl+C  quit                  │──────────────────────────┘"
 " Esc close · Ctrl+R run · :└──────────────────────────────────┘ save · S saved · ? help   "

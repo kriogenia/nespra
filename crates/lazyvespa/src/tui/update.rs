@@ -107,7 +107,20 @@ pub fn update(model: &mut Model, message: Message) -> Vec<Effect> {
             }
         }
         Message::Tick => return check_health(model),
-        Message::HealthChecked { id, result } => model.finish_health_check(id, result),
+        Message::HealthChecked { id, result } => {
+            let was_up = model.is_up();
+            model.finish_health_check(id, result);
+            // The application may have changed while the target was not up, like after a
+            // restart or the first time it is checked
+            if !was_up && model.is_up() {
+                return fetch_deployment(model);
+            }
+        }
+        Message::OpenInfo => {
+            model.open_info_panel();
+            return fetch_deployment(model);
+        }
+        Message::DeploymentFetched { id, result } => model.finish_deployment_fetch(id, result),
         Message::SaveQuery(name) => return save_query(model, name),
         Message::NotSaved(error) => model.set_notice(Notice::Error(error)),
         Message::CloseOverlay => model.close_overlay(),
@@ -121,6 +134,15 @@ fn check_health(model: &mut Model) -> Vec<Effect> {
     model
         .start_health_check()
         .map(|(id, admin)| Effect::CheckHealth { id, admin })
+        .into_iter()
+        .collect()
+}
+
+/// Requests the status of the application of the target, unless it is being requested.
+fn fetch_deployment(model: &mut Model) -> Vec<Effect> {
+    model
+        .start_deployment_fetch()
+        .map(|(id, admin)| Effect::FetchDeployment { id, admin })
         .into_iter()
         .collect()
 }
@@ -195,6 +217,7 @@ fn command_message(command: Command) -> Message {
         Command::History => Message::OpenHistory,
         Command::Save(name) => Message::SaveQuery(name),
         Command::Saved => Message::OpenSaved,
+        Command::Info => Message::OpenInfo,
     }
 }
 
@@ -250,7 +273,7 @@ mod test {
     use crate::core::{
         config::{Config, Target},
         connection::ActiveTarget,
-        health::HealthCheck,
+        health::{Deployment, HealthCheck},
         history::Histories,
         query::QueryDraft,
         saved::SavedQueries,
@@ -695,6 +718,78 @@ mod test {
             },
         );
         assert_eq!(model.health(), Some(&up()));
+    }
+
+    /// Answers a health check, returning the effects.
+    fn answer_health(model: &mut Model, result: Result<HealthCheck, String>) -> Vec<Effect> {
+        let id = health_check_id(&update(model, Message::Tick)).unwrap();
+        update(model, Message::HealthChecked { id, result })
+    }
+
+    fn deployment_fetch_id(effects: &[Effect]) -> Option<u64> {
+        match effects {
+            [Effect::FetchDeployment { id, .. }] => Some(*id),
+            _ => None,
+        }
+    }
+
+    fn deployment() -> Deployment {
+        Deployment {
+            vespa_version: "8.512.1".to_string(),
+            ..Deployment::default()
+        }
+    }
+
+    #[test]
+    fn test_deployment_is_fetched_when_the_target_comes_up() {
+        let mut model = connected();
+        let id = deployment_fetch_id(&answer_health(&mut model, up())).unwrap();
+        let result = Ok(deployment());
+        let _ = update(&mut model, Message::DeploymentFetched { id, result });
+        assert_eq!(model.deployment(), Some(&Ok(deployment())));
+
+        // Not again while it stays up
+        assert!(answer_health(&mut model, up()).is_empty());
+        // But after it was down, as it may have been upgraded
+        let _ = answer_health(&mut model, Err("connection refused".to_string()));
+        assert!(deployment_fetch_id(&answer_health(&mut model, up())).is_some());
+    }
+
+    #[test]
+    fn test_open_info_fetches_the_deployment() {
+        let mut model = connected();
+        let effects = press(&mut model, KeyCode::Char('I'));
+        assert_eq!(model.overlay(), Some(&Overlay::Info));
+        let id = deployment_fetch_id(&effects).unwrap();
+        // Only one request at a time
+        let _ = press(&mut model, KeyCode::Esc);
+        assert!(run_command(&mut model, "info").is_empty());
+        assert_eq!(model.overlay(), Some(&Overlay::Info));
+        assert!(model.is_fetching_deployment());
+
+        let result = Err("Unexpected HTTP status 403 Forbidden".to_string());
+        let _ = update(&mut model, Message::DeploymentFetched { id, result });
+        assert!(!model.is_fetching_deployment());
+        assert!(matches!(model.deployment(), Some(Err(_))));
+    }
+
+    #[test]
+    fn test_new_target_forgets_the_deployment() {
+        let mut model = connected();
+        let id = deployment_fetch_id(&answer_health(&mut model, up())).unwrap();
+        let _ = update(
+            &mut model,
+            Message::DeploymentFetched {
+                id,
+                result: Ok(deployment()),
+            },
+        );
+        let target = ActiveTarget::open("prod", Target::self_hosted("http://prod:8080"));
+        let _ = update(
+            &mut model,
+            Message::TargetOpened(Ok(Box::new(target.unwrap()))),
+        );
+        assert_eq!(model.deployment(), None);
     }
 
     #[test]

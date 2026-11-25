@@ -6,7 +6,11 @@ use super::{
     history_picker::HistoryMsg, palette::PaletteMsg, query_editor::EditorMsg, results::ResultsMsg,
     saved_picker::SavedMsg, target_picker::PickerMsg,
 };
-use crate::core::{connection::ActiveTarget, health::HealthCheck, search::SearchOutcome};
+use crate::core::{
+    connection::ActiveTarget,
+    health::{Deployment, HealthCheck},
+    search::SearchOutcome,
+};
 
 /// Something that happened and the application reacts to.
 #[derive(Debug, Clone)]
@@ -58,6 +62,15 @@ pub enum Message {
         id: u64,
         /// Health of the target, or why it could not be checked.
         result: Result<HealthCheck, String>,
+    },
+    /// Open the panel with information about the target: its health and deployment.
+    OpenInfo,
+    /// Result of a request of the status of the application of the target.
+    DeploymentFetched {
+        /// Identifier of the request.
+        id: u64,
+        /// Status of the application, or why it could not be requested.
+        result: Result<Deployment, String>,
     },
     /// Save the query of the editor under the name.
     SaveQuery(String),

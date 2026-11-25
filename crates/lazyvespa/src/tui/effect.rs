@@ -39,6 +39,14 @@ pub enum Effect {
         /// Client of the target.
         admin: Admin,
     },
+    /// Request the status of the application of a target, answered with
+    /// [`Message::DeploymentFetched`].
+    FetchDeployment {
+        /// Identifier of the request, to tell apart the answers of older requests.
+        id: u64,
+        /// Client of the target.
+        admin: Admin,
+    },
     /// Save the histories in the file, answered with [`Message::NotSaved`] only when it
     /// fails.
     SaveHistory {
@@ -102,6 +110,12 @@ impl EffectRunner {
                 tokio::spawn(async move {
                     let result = health::check(&admin).await.map_err(|e| e.to_string());
                     let _ = messages.send(Message::HealthChecked { id, result });
+                });
+            }
+            Effect::FetchDeployment { id, admin } => {
+                tokio::spawn(async move {
+                    let result = health::deployment(&admin).await.map_err(|e| e.to_string());
+                    let _ = messages.send(Message::DeploymentFetched { id, result });
                 });
             }
             Effect::SaveHistory { path, histories } => {

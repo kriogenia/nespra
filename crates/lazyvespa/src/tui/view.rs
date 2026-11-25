@@ -6,7 +6,7 @@ use ratatui::{
 };
 
 use super::{
-    Message, Model, help,
+    Message, Model, help, info_panel,
     keymap::Binding,
     model::{Notice, Overlay, Pane},
     results, status_bar,
@@ -22,7 +22,7 @@ pub fn view(model: &Model, frame: &mut Frame) {
     ])
     .areas(frame.area());
 
-    status_bar::render(model.target(), model.health(), frame, header);
+    status_bar::render(model, frame, header);
     let [editor, results] =
         Layout::vertical([Constraint::Length(8), Constraint::Fill(1)]).areas(main);
     let pane = model.pane();
@@ -57,6 +57,7 @@ pub fn view(model: &Model, frame: &mut Frame) {
         Some(Overlay::TargetPicker(picker)) => picker.render(frame, main),
         Some(Overlay::HistoryPicker(picker)) => picker.render(frame, main),
         Some(Overlay::SavedPicker(picker)) => picker.render(frame, main),
+        Some(Overlay::Info) => info_panel::render(model, frame, main),
         _ => {}
     }
 }
@@ -232,7 +233,7 @@ mod test {
         let line = hints(&[crate::tui::keymap::GLOBAL], 200);
         assert_eq!(
             line.to_string(),
-            " Ctrl+R run · : command · T targets · H history · s save · S saved · ? help · q quit"
+            " Ctrl+R run · : command · T targets · H history · s save · S saved · I info · ? help · q quit"
         );
     }
 

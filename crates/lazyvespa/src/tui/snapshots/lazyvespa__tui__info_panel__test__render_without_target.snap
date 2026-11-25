@@ -1,0 +1,16 @@
+---
+source: crates/lazyvespa/src/tui/info_panel.rs
+expression: "render(&Model::default()).backend()"
+---
+"                                                                      "
+"                                                                      "
+"                                                                      "
+"                                                                      "
+"                                                                      "
+"    ┌ Info ──────────────────────────────────────────────────────┐    "
+"    │ Not connected to a target, press T to pick one             │    "
+"    └────────────────────────────────────────────────────────────┘    "
+"                                                                      "
+"                                                                      "
+"                                                                      "
+"                                                                      "
