@@ -32,6 +32,10 @@ The [`nespra_admin`](crates/admin) crate covers the operational APIs of Vespa, l
 
 The [`pynespra`](crates/pynespra) crate packages the client as a Python library, published to PyPI as `pynespra` and imported as `nespra`. See its [README](crates/pynespra/README.md).
 
+## lazyvespa
+
+[`lazyvespa`](crates/lazyvespa) is a terminal UI built on these crates to query and operate Vespa, self-hosted or on Vespa Cloud: run queries and browse their hits, keep a history and saved queries, switch between targets and watch their health. Run `just try` to start a local Vespa with sample documents and open lazyvespa on it. See its [README](crates/lazyvespa/README.md).
+
 ## Releasing
 
 Releases are automated with [release-plz](https://release-plz.dev):
@@ -41,10 +45,6 @@ Releases are automated with [release-plz](https://release-plz.dev):
 3. Review and merge that PR. release-plz then tags the commit, creates the GitHub release and publishes the crate to crates.io.
 
 The commit types drive the version bump: `feat` is a minor bump, `fix` and other changes are a patch bump, and a `!` after the type or a `BREAKING CHANGE:` footer is a major bump (minor while below 1.0).
-
-### Operational APIs
-
-The [`nespra_admin`](crates/admin) crate covers the operational APIs of Vespa, like the health of the nodes. Use it on its own or enable the `admin` feature to get it as `nespra::admin`. Both clients accept the same `reqwest::Client`, so they can share connections and TLS configuration.
 
 ## Python package
 

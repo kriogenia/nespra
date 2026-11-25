@@ -255,6 +255,20 @@ mod test {
     }
 
     #[test]
+    fn test_example_config() {
+        let config = Config::from_toml(include_str!("../../config.example.toml")).unwrap();
+        assert_eq!(config.default_target().unwrap().0, "local");
+        let names: Vec<_> = config.targets.keys().map(String::as_str).collect();
+        assert_eq!(names, ["local", "onprem", "prod", "staging"]);
+        assert_eq!(
+            config.target("staging").unwrap().auth,
+            Auth::Token {
+                env: "VESPA_TOKEN".to_string()
+            }
+        );
+    }
+
+    #[test]
     fn test_empty_config() {
         let config = Config::from_toml("").unwrap();
         assert_eq!(config, Config::default());
