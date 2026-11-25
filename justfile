@@ -18,10 +18,34 @@ set default-list := true
 @hooks:
   prek install
 
-# TODO: set-up with uv and Vespa container set-up
-
 # Starts the development Vespa Docker service
 [group("docker")]
 [working-directory: "scripts"]
 @start:
   uv run start --restart
+
+# Stops the development Vespa Docker service
+[group("docker")]
+@stop:
+  docker stop sample
+
+# Feeds 100 documents of the NFCorpus dataset to the development Vespa
+[group("docker")]
+[working-directory: "scripts"]
+@feed:
+  uv run feed
+
+# Runs a sample query against the development Vespa and prints its JSON response
+[group("docker")]
+[working-directory: "scripts"]
+@query:
+  uv run query
+
+# Opens lazyvespa on the development Vespa, or with the given arguments: `just tui --target prod`
+[group("lazyvespa")]
+tui *args:
+  cargo run -q -p lazyvespa -- {{ if args == "" { "--url http://localhost:8080" } else { args } }}
+
+# Starts the development Vespa, feeds it and opens lazyvespa on it, try `select * from doc where userQuery()` with the parameter query=cancer
+[group("lazyvespa")]
+lazy: start feed tui

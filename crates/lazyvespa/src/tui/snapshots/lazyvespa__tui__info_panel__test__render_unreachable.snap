@@ -1,0 +1,16 @@
+---
+source: crates/lazyvespa/src/tui/info_panel.rs
+expression: render(&model).backend()
+---
+"                                                                      "
+"                                                                      "
+"                                                                      "
+"    ┌ Info of local ─────────────────────────────────────────────┐    "
+"    │ Status       ● unreachable                                 │    "
+"    │ Error        error sending request                         │    "
+"    │                                                            │    "
+"    │ Application  unknown until the target is up                │    "
+"    └────────────────────────────────────────────────────────────┘    "
+"                                                                      "
+"                                                                      "
+"                                                                      "

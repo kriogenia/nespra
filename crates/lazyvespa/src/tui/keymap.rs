@@ -114,6 +114,11 @@ pub const GLOBAL: &[Binding] = &[
         description: "saved",
     },
     Binding {
+        keys: &[Key::char('I')],
+        message: Message::OpenInfo,
+        description: "info",
+    },
+    Binding {
         keys: &[Key::char('?')],
         message: Message::ToggleHelp,
         description: "help",

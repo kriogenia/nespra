@@ -16,7 +16,7 @@ release = false
 [[package]]
 name = "nespra_admin"
 
-# Not released until it has its first usable version
+# An application: its library only organizes the code, it is not an API to keep stable
 [[package]]
 name = "lazyvespa"
-release = false
+semver_check = false

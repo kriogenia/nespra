@@ -4,6 +4,7 @@ mod effect;
 mod event;
 mod help;
 mod history_picker;
+mod info_panel;
 mod keymap;
 mod message;
 mod model;
@@ -18,7 +19,7 @@ mod target_picker;
 mod update;
 mod view;
 
-use std::io;
+use std::{io, time::Duration};
 
 use ratatui::DefaultTerminal;
 use tokio::sync::mpsc;
@@ -29,6 +30,9 @@ pub use model::Model;
 pub use update::update;
 pub use view::view;
 
+/// Time between two [`Message::Tick`]s, and so between two health checks of the target.
+const TICK_PERIOD: Duration = Duration::from_secs(5);
+
 /// Runs the application until it is asked to quit.
 ///
 /// # Errors
@@ -37,7 +41,7 @@ pub use view::view;
 pub async fn run(terminal: &mut DefaultTerminal, mut model: Model) -> io::Result<()> {
     let (sender, receiver) = mpsc::unbounded_channel();
     let effects = effect::EffectRunner::new(sender);
-    let mut events = event::Events::new(receiver);
+    let mut events = event::Events::new(receiver, TICK_PERIOD);
     while model.is_running() {
         terminal.draw(|frame| view(&model, frame))?;
         if let Some(message) = events.next().await? {

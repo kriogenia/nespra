@@ -3,13 +3,13 @@
 
 use std::{path::PathBuf, sync::Arc};
 
-use nespra::Vespa;
+use nespra::{Vespa, admin::Admin};
 use serde::Serialize;
 use tokio::sync::{mpsc::UnboundedSender, watch};
 
 use super::Message;
 use crate::core::{
-    config::Target, connection::ActiveTarget, history::Histories, query::QueryRequest,
+    config::Target, connection::ActiveTarget, health, history::Histories, query::QueryRequest,
     saved::SavedQueries, search, store,
 };
 
@@ -31,6 +31,21 @@ pub enum Effect {
         vespa: Vespa,
         /// Request to send.
         request: QueryRequest,
+    },
+    /// Check the health of a target, answered with [`Message::HealthChecked`].
+    CheckHealth {
+        /// Identifier of the check, to tell apart the answers of older checks.
+        id: u64,
+        /// Client of the target.
+        admin: Admin,
+    },
+    /// Request the status of the application of a target, answered with
+    /// [`Message::DeploymentFetched`].
+    FetchDeployment {
+        /// Identifier of the request, to tell apart the answers of older requests.
+        id: u64,
+        /// Client of the target.
+        admin: Admin,
     },
     /// Save the histories in the file, answered with [`Message::NotSaved`] only when it
     /// fails.
@@ -89,6 +104,18 @@ impl EffectRunner {
                         .map(Arc::new)
                         .map_err(|e| format!("Search failed: {e}"));
                     let _ = messages.send(Message::SearchDone { id, result });
+                });
+            }
+            Effect::CheckHealth { id, admin } => {
+                tokio::spawn(async move {
+                    let result = health::check(&admin).await.map_err(|e| e.to_string());
+                    let _ = messages.send(Message::HealthChecked { id, result });
+                });
+            }
+            Effect::FetchDeployment { id, admin } => {
+                tokio::spawn(async move {
+                    let result = health::deployment(&admin).await.map_err(|e| e.to_string());
+                    let _ = messages.send(Message::DeploymentFetched { id, result });
                 });
             }
             Effect::SaveHistory { path, histories } => {

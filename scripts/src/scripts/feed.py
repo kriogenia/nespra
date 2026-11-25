@@ -1,11 +1,11 @@
-from vespa.io import VespaResponse
 from datasets import load_dataset
+from vespa.io import VespaResponse
 
-import app
+from scripts import app, eprint
 
 
 def feed():
-    print("> Loading dataset")
+    eprint("> Loading dataset")
     dataset = load_dataset("BeIR/nfcorpus", "corpus", split="corpus", streaming=True)
     vespa_feed = dataset.map(
         lambda x: {
@@ -17,15 +17,18 @@ def feed():
     vespa = app.load()
 
     def callback(response: VespaResponse, id: str):
-        if response.is_successful():
-            print("Feeding completed")
-        else:
-            print(f"Error when feeding document {id}: {response.get_json()}")
+        if not response.is_successful():
+            eprint(f"Error when feeding document {id}: {response.get_json()}")
 
-    print("> Feeding dataset")
+    eprint("> Feeding dataset")
     vespa.feed_iterable(
         vespa_feed,
         schema="doc",
         namespace="tutorial",
         callback=callback,
     )
+    eprint("> Feeding completed")
+
+
+if __name__ == "__main__":
+    feed()

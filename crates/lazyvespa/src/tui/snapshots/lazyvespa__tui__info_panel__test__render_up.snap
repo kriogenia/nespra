@@ -1,0 +1,16 @@
+---
+source: crates/lazyvespa/src/tui/info_panel.rs
+expression: render(&model).backend()
+---
+"                                                                      "
+"                                                                      "
+"    ┌ Info of local ─────────────────────────────────────────────┐    "
+"    │ Status       ● up                                          │    "
+"    │ Checked in   3 ms                                          │    "
+"    │                                                            │    "
+"    │ Vespa        8.512.1                                       │    "
+"    │ Application  default                                       │    "
+"    │ Generation   2                                             │    "
+"    │ Deployed     2026-11-25 17:19:22 UTC                       │    "
+"    └────────────────────────────────────────────────────────────┘    "
+"                                                                      "

@@ -1,0 +1,31 @@
+# Example configuration of lazyvespa.
+#
+# Copy it to ~/.config/lazyvespa/config.toml (or $XDG_CONFIG_HOME/lazyvespa/config.toml),
+# or pass it with `lazyvespa --config <file>`.
+
+# Target used when none is given with --target. Optional when there is only one target.
+default_target = "local"
+
+# A self-hosted Vespa, like the one started with `just start`.
+[targets.local]
+endpoint = "http://localhost:8080"
+
+# A Vespa Cloud deployment authenticated with the data plane certificate.
+# Without `cert` and `key`, the ones created by `vespa auth cert` are used:
+# ~/.vespa/<tenant>.<application>.<instance>/data-plane-{public-cert,private-key}.pem
+[targets.prod]
+endpoint = "https://abcdef.ghijkl.z.vespa-app.cloud"
+cloud = { tenant = "acme", application = "search", instance = "default" }
+auth = { mtls = {} }
+
+# A Vespa Cloud deployment authenticated with a token. The token is read from the
+# environment variable, so it is never written in this file.
+[targets.staging]
+endpoint = "https://mnopqr.stuvwx.z.vespa-app.cloud"
+cloud = { tenant = "acme", application = "search", instance = "staging" }
+auth = { token = { env = "VESPA_TOKEN" } }
+
+# A self-hosted Vespa behind mTLS with its own certificate.
+[targets.onprem]
+endpoint = "https://vespa.internal:8443"
+auth = { mtls = { cert = "/etc/vespa/client.pem", key = "/etc/vespa/client.key" } }
