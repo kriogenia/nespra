@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/kriogenia/nespra/compare/nespra-v0.1.3...nespra-v0.2.0) - 2026-11-25
+
+### Added
+
+- *(lazy)* health check and panel ([#33](https://github.com/kriogenia/nespra/pull/33))
+- lazyvespa ([#29](https://github.com/kriogenia/nespra/pull/29))
+
 ## [0.1.3](https://github.com/kriogenia/nespra/compare/nespra-v0.1.2...nespra-v0.1.3) - 2026-11-20
 
 ### Added
