@@ -50,7 +50,11 @@ container.
 
 ## Install
 
-lazyvespa is not published to crates.io yet. Install it from the repository:
+```sh
+cargo install --locked lazyvespa
+```
+
+Or the latest changes, from the repository:
 
 ```sh
 cargo install --locked --git https://github.com/kriogenia/nespra lazyvespa
